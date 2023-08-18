@@ -133,3 +133,26 @@ pub const TFHE_LIB_PARAMETERS: BooleanParameters = BooleanParameters {
     ks_base_log: DecompositionBaseLog(5),
     ks_level: DecompositionLevelCount(3),
 };
+
+pub const DEMO_PARAMETERS: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(16),
+    glwe_dimension: GlweDimension(1),
+    polynomial_size: PolynomialSize(128),
+    lwe_modular_std_dev: StandardDev(0.000003725679281679651),
+    glwe_modular_std_dev: StandardDev(0.0000000000034525330484572114),
+    pbs_base_log: DecompositionBaseLog(8),
+    pbs_level: DecompositionLevelCount(2),
+    ks_base_log: DecompositionBaseLog(5),
+    ks_level: DecompositionLevelCount(2),
+};
+
+// ! don't forget
+pub const FPGA_BOOTSTRAP_PACKING: usize = 23;
+
+pub const MEM_LWE_IN_SIZE: usize =
+    (FPGA_BOOTSTRAP_PACKING * DEMO_PARAMETERS.lwe_dimension.0) * std::mem::size_of::<u32>();
+
+pub const MEM_LWE_OUT_SIZE: usize = (FPGA_BOOTSTRAP_PACKING
+    * (DEMO_PARAMETERS.glwe_dimension.0 + 1)
+    * DEMO_PARAMETERS.polynomial_size.0)
+    * std::mem::size_of::<u32>();

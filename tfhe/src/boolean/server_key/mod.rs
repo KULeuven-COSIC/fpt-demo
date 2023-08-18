@@ -12,8 +12,10 @@ use crate::boolean::ciphertext::Ciphertext;
 use crate::boolean::client_key::ClientKey;
 pub use crate::boolean::engine::bootstrapping::{CompressedServerKey, ServerKey};
 use crate::boolean::engine::{
-    BinaryGatesAssignEngine, BinaryGatesEngine, BooleanEngine, WithThreadLocalEngine,
+    BinaryGatesAssignEngine, BinaryGatesEngine, PackedBinaryGatesEngine, FpgaEngine, BooleanEngine, WithThreadLocalEngine,
 };
+
+use super::engine::Gate;
 
 pub trait BinaryBooleanGates<L, R> {
     fn and(&self, ct_left: L, ct_right: R) -> Ciphertext;
@@ -33,6 +35,22 @@ pub trait BinaryBooleanGatesAssign<L, R> {
     fn xnor_assign(&self, ct_left: L, ct_right: R);
 }
 
+pub trait PackedBinaryBooleanGates<L, R> {
+    fn gates_packed(
+        &self,
+        gates: &Vec<Gate>,
+        cts_left: &Vec<L>,
+        cts_right: &Vec<R>,
+    ) -> Vec<Ciphertext>;
+    fn and_packed(&self, cts_left: &Vec<L>, cts_right: &Vec<R>) -> Vec<Ciphertext>;
+    fn or_packed(&self, cts_left: &Vec<L>, cts_right: &Vec<R>) -> Vec<Ciphertext>;
+    fn xor_packed(&self, cts_left: &Vec<L>, cts_right: &Vec<R>) -> Vec<Ciphertext>;
+}
+
+pub trait FpgaGates {
+    fn enable_fpga(&self);
+}
+
 trait DefaultImplementation {
     type Engine: WithThreadLocalEngine;
 }
@@ -42,6 +60,53 @@ mod implementation {
 
     impl DefaultImplementation for ServerKey {
         type Engine = BooleanEngine;
+    }
+}
+
+impl<Lhs, Rhs> PackedBinaryBooleanGates<Lhs, Rhs> for ServerKey
+where
+    <ServerKey as DefaultImplementation>::Engine: PackedBinaryGatesEngine<Lhs, Rhs, ServerKey>,
+{
+    fn gates_packed(
+        &self,
+        gates: &Vec<Gate>,
+        cts_left: &Vec<Lhs>,
+        cts_right: &Vec<Rhs>,
+    ) -> Vec<Ciphertext> {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.gates_packed(gates, cts_left, cts_right, self)
+        })
+    }
+
+    fn and_packed(&self, cts_left: &Vec<Lhs>, cts_right: &Vec<Rhs>) -> Vec<Ciphertext> {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.and_packed(cts_left, cts_right, self)
+        })
+    }
+
+    fn or_packed(&self, cts_left: &Vec<Lhs>, cts_right: &Vec<Rhs>) -> Vec<Ciphertext> {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.or_packed(cts_left, cts_right, self)
+        })
+    }
+
+    fn xor_packed(&self, cts_left: &Vec<Lhs>, cts_right: &Vec<Rhs>) -> Vec<Ciphertext> {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.xor_packed(cts_left, cts_right, self)
+        })
+    }
+}
+
+impl FpgaGates for ServerKey
+where
+    <ServerKey as DefaultImplementation>::Engine: FpgaEngine<ServerKey>,
+{
+    fn enable_fpga(
+        &self
+    ) {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.enable_fpga();
+        })
     }
 }
 
@@ -142,6 +207,10 @@ impl ServerKey {
 
     pub fn not_assign(&self, ct: &mut Ciphertext) {
         BooleanEngine::with_thread_local_mut(|engine| engine.not_assign(ct))
+    }
+
+    pub fn not_packed(&self, cts: &Vec<Ciphertext>) -> Vec<Ciphertext> {
+        BooleanEngine::with_thread_local_mut(|engine| engine.not_packed(cts))
     }
 
     pub fn mux(

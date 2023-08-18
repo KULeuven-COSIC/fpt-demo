@@ -28,7 +28,7 @@ impl FheBoolParameters {
         Self::from_static(&TFHE_LIB_PARAMETERS)
     }
 
-    fn from_static(params: &'static BooleanParameters) -> Self {
+    pub fn from_static(params: &'static BooleanParameters) -> Self {
         (*params).into()
     }
 }

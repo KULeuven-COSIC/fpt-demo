@@ -12,6 +12,12 @@ pub use concrete_csprng::seeders::RdseedSeeder;
 #[cfg(feature = "seeder_unix")]
 pub use concrete_csprng::seeders::UnixSeeder;
 
+#[cfg(feature = "seeder_deterministic")]
+use {
+    super::commons::generators::DeterministicSeeder, super::prelude::ActivatedRandomGenerator,
+    concrete_csprng::seeders::Seed,
+};
+
 #[cfg(feature = "__wasm_api")]
 mod wasm_seeder {
     use crate::core_crypto::commons::math::random::{Seed, Seeder};
@@ -75,9 +81,18 @@ pub fn new_seeder() -> Box<dyn Seeder> {
 
     #[cfg(not(feature = "__wasm_api"))]
     {
+        #[cfg(feature = "seeder_deterministic")]
+        {
+            if seeder.is_none() {
+                seeder = Some(Box::new(
+                    DeterministicSeeder::<ActivatedRandomGenerator>::new(Seed(0)),
+                ));
+            }
+        }
+
         #[cfg(feature = "seeder_x86_64_rdseed")]
         {
-            if RdseedSeeder::is_available() {
+            if seeder.is_none() && RdseedSeeder::is_available() {
                 seeder = Some(Box::new(RdseedSeeder));
             }
         }

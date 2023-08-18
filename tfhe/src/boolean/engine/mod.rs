@@ -30,6 +30,48 @@ pub(crate) trait BinaryGatesEngine<L, R, K> {
     fn xnor(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
 }
 
+#[derive(Clone)]
+pub enum Gate {
+    AND,
+    OR,
+    XOR,
+}
+
+pub(crate) trait PackedBinaryGatesEngine<L, R, K> {
+    fn gates_packed(
+        &mut self,
+        gates: &Vec<Gate>,
+        cts_left: &Vec<L>,
+        cts_right: &Vec<R>,
+        server_key: &K,
+    ) -> Vec<Ciphertext>;
+
+    fn and_packed(
+        &mut self,
+        cts_left: &Vec<L>,
+        cts_right: &Vec<R>,
+        server_key: &K,
+    ) -> Vec<Ciphertext>;
+
+    fn or_packed(
+        &mut self,
+        cts_left: &Vec<L>,
+        cts_right: &Vec<R>,
+        server_key: &K,
+    ) -> Vec<Ciphertext>;
+
+    fn xor_packed(
+        &mut self,
+        cts_left: &Vec<L>,
+        cts_right: &Vec<R>,
+        server_key: &K,
+    ) -> Vec<Ciphertext>;
+}
+
+pub(crate) trait FpgaEngine<K> {
+    fn enable_fpga(&mut self);
+}
+
 pub(crate) trait BinaryGatesAssignEngine<L, R, K> {
     fn and_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
     fn nand_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
@@ -63,7 +105,7 @@ pub struct BooleanEngine {
     /// generate mask coefficients and one privately seeded used to generate errors during
     /// encryption.
     encryption_generator: EncryptionRandomGenerator<ActivatedRandomGenerator>,
-    bootstrapper: Bootstrapper,
+    pub bootstrapper: Bootstrapper,
 }
 
 impl WithThreadLocalEngine for BooleanEngine {
@@ -261,7 +303,7 @@ impl BooleanEngine {
         );
 
         Ciphertext::Encrypted(output)
-    }
+    }    
     pub fn encrypt_with_compressed_public_key(
         &mut self,
         message: bool,
@@ -326,6 +368,10 @@ impl BooleanEngine {
                 lwe_ciphertext_opposite_assign(ct_ct); // compute the negation
             }
         }
+    }
+
+    pub fn not_packed(&mut self, cts: &Vec<Ciphertext>) -> Vec<Ciphertext> {
+        return cts.iter().map(|ct| self.not(ct)).collect();
     }
 }
 
@@ -467,7 +513,7 @@ impl BooleanEngine {
                         .bootstrapping_key
                         .input_lwe_dimension()
                         .to_lwe_size(),
-                    ct_condition_ct.ciphertext_modulus(),
+                        ct_condition_ct.ciphertext_modulus(),
                 );
 
                 let buffer_lwe_before_pbs = &mut buffer_lwe_before_pbs_o;
@@ -506,6 +552,134 @@ impl BooleanEngine {
                 Ciphertext::Encrypted(ct_ks)
             }
         }
+    }
+}
+
+use itertools::izip;
+
+impl PackedBinaryGatesEngine<Ciphertext, Ciphertext, ServerKey> for BooleanEngine {
+    
+    fn gates_packed(
+        &mut self,
+        gates: &Vec<Gate>,
+        cts_left: &Vec<Ciphertext>,
+        cts_right: &Vec<Ciphertext>,
+        server_key: &ServerKey,
+    ) -> Vec<Ciphertext> {
+        assert!(gates.len() == cts_left.len());
+        // assert!(gates.len() == cts_right.len());
+
+        let mut buffers_lwe_before_pbs = Vec::<LweCiphertext<Vec<u32>>>::new();
+
+        for (ct_left, ct_right, gate) in izip!(cts_left, cts_right, gates) {
+            match (ct_left, ct_right) {
+                (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
+                    let mut buffer_lwe_before_pbs = LweCiphertext::new(
+                        0u32,
+                        server_key
+                            .bootstrapping_key
+                            .input_lwe_dimension()
+                            .to_lwe_size(),
+                        ct_left_ct.ciphertext_modulus(),
+                    );
+
+                    match gate {
+                        Gate::AND => {
+                            // compute the linear combination for AND: ct_left + ct_right + (0,...,0,-1/8)
+                            // ct_left + ct_right
+                            lwe_ciphertext_add(&mut buffer_lwe_before_pbs, ct_left_ct, ct_right_ct);
+                            let cst = Plaintext(PLAINTEXT_FALSE);
+                            // - 1/8
+                            lwe_ciphertext_plaintext_add_assign(&mut buffer_lwe_before_pbs, cst);
+                        }
+                        Gate::OR => {
+                            // Compute the linear combination for OR: ct_left + ct_right + (0,...,0,+1/8)
+                            // ct_left + ct_right
+                            lwe_ciphertext_add(&mut buffer_lwe_before_pbs, ct_left_ct, ct_right_ct);
+                            let cst = Plaintext(PLAINTEXT_TRUE);
+                            // + 1/8
+                            lwe_ciphertext_plaintext_add_assign(&mut buffer_lwe_before_pbs, cst);
+                        }
+                        Gate::XOR => {
+                            // Compute the linear combination for XOR: 2*(ct_left + ct_right) +
+                            // (0,...,0,1/4) ct_left + ct_right
+                            lwe_ciphertext_add(&mut buffer_lwe_before_pbs, ct_left_ct, ct_right_ct);
+                            let cst_add = Plaintext(PLAINTEXT_TRUE);
+                            // + 1/8
+                            lwe_ciphertext_plaintext_add_assign(
+                                &mut buffer_lwe_before_pbs,
+                                cst_add,
+                            );
+                            let cst_mul = Cleartext(2u32);
+                            //* 2
+                            lwe_ciphertext_cleartext_mul_assign(
+                                &mut buffer_lwe_before_pbs,
+                                cst_mul,
+                            );
+                        }
+                    }
+
+                    buffers_lwe_before_pbs.push(buffer_lwe_before_pbs);
+                }
+                _ => todo!(),
+            }
+        }
+
+        return self
+            .bootstrapper
+            .bootstrap_and_keyswitch_packed(&mut buffers_lwe_before_pbs, server_key);
+    }
+
+    fn and_packed(
+        &mut self,
+        cts_left: &Vec<Ciphertext>,
+        cts_right: &Vec<Ciphertext>,
+        server_key: &ServerKey,
+    ) -> Vec<Ciphertext> {
+        return self.gates_packed(
+            &vec![Gate::AND; cts_left.len()],
+            cts_left,
+            cts_right,
+            server_key,
+        );
+    }
+
+    fn or_packed(
+        &mut self,
+        cts_left: &Vec<Ciphertext>,
+        cts_right: &Vec<Ciphertext>,
+        server_key: &ServerKey,
+    ) -> Vec<Ciphertext> {
+        return self.gates_packed(
+            &vec![Gate::OR; cts_left.len()],
+            cts_left,
+            cts_right,
+            server_key,
+        );
+    }
+
+    fn xor_packed(
+        &mut self,
+        cts_left: &Vec<Ciphertext>,
+        cts_right: &Vec<Ciphertext>,
+        server_key: &ServerKey,
+    ) -> Vec<Ciphertext> {
+        return self.gates_packed(
+            &vec![Gate::XOR; cts_left.len()],
+            cts_left,
+            cts_right,
+            server_key,
+        );
+    }
+}
+
+impl FpgaEngine<ServerKey> for BooleanEngine {
+    
+    fn enable_fpga(
+        &mut self
+    ) {
+        self
+            .bootstrapper.enable_fpga();
     }
 }
 

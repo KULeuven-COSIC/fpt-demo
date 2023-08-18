@@ -44,6 +44,7 @@ log = "0.4.19"
 
 [build-dependencies]
 cbindgen = { version = "0.24.3", optional = true }
+bindgen = "*"
 
 [dependencies]
 concrete-csprng = { version = "0.3.0", features = [
@@ -80,6 +81,7 @@ boolean = []
 shortint = []
 integer = ["shortint"]
 internal-keycache = ["lazy_static", "fs2", "bincode"]
+fpga = []
 
 # Experimental section
 experimental = []
@@ -119,6 +121,7 @@ generator_aarch64_aes = ["concrete-csprng/generator_aarch64_aes"]
 # Private features
 __profiling = []
 
+seeder_deterministic = []
 seeder_unix = ["concrete-csprng/seeder_unix"]
 seeder_x86_64_rdseed = ["concrete-csprng/seeder_x86_64_rdseed"]
 

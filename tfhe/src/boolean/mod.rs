@@ -72,10 +72,10 @@ pub mod server_key;
 pub(crate) const PLAINTEXT_LOG_SCALING_FACTOR: usize = 3;
 
 /// The plaintext associated with true: 1/8
-pub(crate) const PLAINTEXT_TRUE: u32 = 1 << (32 - PLAINTEXT_LOG_SCALING_FACTOR);
+pub const PLAINTEXT_TRUE: u32 = 1 << (32 - PLAINTEXT_LOG_SCALING_FACTOR);
 
 /// The plaintext associated with false: -1/8
-pub(crate) const PLAINTEXT_FALSE: u32 = 7 << (32 - PLAINTEXT_LOG_SCALING_FACTOR);
+pub const PLAINTEXT_FALSE: u32 = 7 << (32 - PLAINTEXT_LOG_SCALING_FACTOR);
 
 /// tool to generate random booleans
 #[cfg(test)]

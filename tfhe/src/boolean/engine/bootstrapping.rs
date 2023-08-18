@@ -1,3 +1,9 @@
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+// Supress not FFI-safe warning
+#![allow(improper_ctypes)]
+
 use crate::boolean::ciphertext::Ciphertext;
 use crate::boolean::{ClientKey, PLAINTEXT_TRUE};
 use crate::core_crypto::algorithms::*;
@@ -9,13 +15,32 @@ use crate::core_crypto::entities::*;
 use crate::core_crypto::fft_impl::fft64::math::fft::Fft;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::os::raw::c_void;
+
+// use std::time::Instant;
+
+#[cfg(feature = "fpga")]
+use {
+    crate::boolean::prelude::{
+        DEMO_PARAMETERS, FPGA_BOOTSTRAP_PACKING, MEM_LWE_IN_SIZE, MEM_LWE_OUT_SIZE,
+    },
+    crate::core_crypto::fft_impl::common::pbs_modulus_switch,
+    crate::core_crypto::prelude::polynomial_algorithms::polynomial_wrapping_monic_monomial_mul_assign,
+    crate::core_crypto::prelude::*,
+    std::env,
+    std::ffi::CString,
+    std::process,
+};
+
+#[cfg(feature = "fpga")]
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 /// Memory used as buffer for the bootstrap
 ///
 /// It contains contiguous chunk which is then sliced and converted
 /// into core's View types.
-#[derive(Default)]
-struct Memory {
+#[derive(Clone, Default)]
+pub struct Memory {
     buffer: Vec<u32>,
 }
 
@@ -25,7 +50,7 @@ impl Memory {
     /// - The first element is the accumulator for bootstrap step.
     /// - The second element is a lwe buffer where the result of the of the bootstrap should be
     ///   written
-    fn as_buffers(
+    pub fn as_buffers(
         &mut self,
         server_key: &ServerKey,
     ) -> (GlweCiphertextView<'_, u32>, LweCiphertextMutView<'_, u32>) {
@@ -84,8 +109,8 @@ impl Memory {
 /// * `key_switching_key` - a public key, used to perform the key-switching operation.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ServerKey {
-    pub(crate) bootstrapping_key: FourierLweBootstrapKeyOwned,
-    pub(crate) key_switching_key: LweKeyswitchKeyOwned<u32>,
+    pub bootstrapping_key: FourierLweBootstrapKeyOwned,
+    pub key_switching_key: LweKeyswitchKeyOwned<u32>,
 }
 
 impl ServerKey {
@@ -123,8 +148,8 @@ pub struct CompressedServerKey {
 }
 
 /// Perform ciphertext bootstraps on the CPU
-pub(crate) struct Bootstrapper {
-    memory: Memory,
+pub struct Bootstrapper {
+    pub memory: Memory,
     /// A structure containing two CSPRNGs to generate material for encryption like public masks
     /// and secret errors.
     ///
@@ -134,6 +159,10 @@ pub(crate) struct Bootstrapper {
     pub(crate) encryption_generator: EncryptionRandomGenerator<ActivatedRandomGenerator>,
     pub(crate) computation_buffers: ComputationBuffers,
     pub(crate) seeder: DeterministicSeeder<ActivatedRandomGenerator>,
+    pub mem_lwe_in: *mut c_void,
+    pub mem_lwe_out: *mut c_void,
+    pub runner_krnl: *mut c_void,
+    pub is_fpga_enabled: bool,
 }
 
 impl Bootstrapper {
@@ -143,6 +172,67 @@ impl Bootstrapper {
             encryption_generator: EncryptionRandomGenerator::<_>::new(seeder.seed(), seeder),
             computation_buffers: Default::default(),
             seeder: DeterministicSeeder::<_>::new(seeder.seed()),
+            // FPGA initialisation stuff
+            mem_lwe_in: std::ptr::null_mut(),
+            mem_lwe_out: std::ptr::null_mut(),
+            runner_krnl: std::ptr::null_mut(),
+            is_fpga_enabled: false,
+        }
+    }
+
+    pub fn enable_fpga(&mut self) {
+        #[cfg(feature = "fpga")]
+        unsafe {
+            if self.is_fpga_enabled == false {
+                let env_var_FPGA_IMAGE = match env::var("FPGA_IMAGE") {
+                    Ok(val) => val,
+                    Err(_) => {
+                        eprintln!("The FPGA_IMAGE environment variable is not set.");
+                        process::exit(1);
+                    }
+                };
+
+                let env_var_fpga_index = match env::var("FPGA_INDEX") {
+                    Ok(val) => match val.parse::<u32>() {
+                        Ok(parsed_val) => parsed_val,
+                        Err(_) => {
+                            // Handle the case when the value cannot be parsed as an integer
+                            eprintln!("The value of FPGA_INDEX is not a valid integer.");
+                            return;
+                        }
+                    },
+                    Err(_) => {
+                        eprintln!("The FPGA_INDEX environment variable is not set.");
+                        process::exit(1);
+                    }
+                };
+
+                let dev = xrtDeviceOpen(env_var_fpga_index);
+                let file_path = CString::new(env_var_FPGA_IMAGE).unwrap();
+                let xclbin = xrtXclbinAllocFilename(file_path.as_ptr());
+                xrtDeviceLoadXclbinHandle(dev, xclbin);
+
+                // Get Kernel UUID
+                let mut kernel_uuid = vec![0u8; 16];
+                let kernel_uuid_ptr = kernel_uuid.as_mut_ptr();
+                xrtDeviceGetXclbinUUID(dev, kernel_uuid_ptr);
+
+                // create Kernel objects
+                let cptr_krnl = CString::new("accel").unwrap();
+                let kernel: xrtKernelHandle =
+                    xrtPLKernelOpenExclusive(dev, kernel_uuid_ptr, cptr_krnl.as_ptr());
+
+                let krnl_grp_0 = xrtKernelArgGroupId(kernel, 0) as u32;
+                let krnl_grp_1 = xrtKernelArgGroupId(kernel, 1) as u32;
+
+                self.mem_lwe_in = xrtBOAlloc(dev, MEM_LWE_IN_SIZE, 0u64, krnl_grp_0);
+                self.mem_lwe_out = xrtBOAlloc(dev, MEM_LWE_OUT_SIZE, 0u64, krnl_grp_1);
+                self.runner_krnl = xrtRunOpen(kernel);
+                xrtRunSetArg(self.runner_krnl, 0, self.mem_lwe_in);
+                xrtRunSetArg(self.runner_krnl, 1, self.mem_lwe_out);
+
+                self.is_fpga_enabled = true;
+            }
         }
     }
 
@@ -252,7 +342,7 @@ impl Bootstrapper {
         })
     }
 
-    pub(crate) fn bootstrap(
+    pub fn bootstrap(
         &mut self,
         input: &LweCiphertextOwned<u32>,
         server_key: &ServerKey,
@@ -308,6 +398,210 @@ impl Bootstrapper {
         keyswitch_lwe_ciphertext(&server_key.key_switching_key, input, &mut output);
 
         Ok(output)
+    }
+
+    pub fn bootstrap_and_keyswitch_packed(
+        &mut self,
+        ciphertexts: &mut Vec<LweCiphertextOwned<u32>>,
+        _server_key: &ServerKey,
+    ) -> Vec<Ciphertext> {
+        #[cfg(not(feature = "fpga"))]
+        let bootstrapped = {
+            // let start = Instant::now();
+            let result: Vec<LweCiphertextOwned<u32>> = ciphertexts
+                .iter_mut()
+                .map(|ct| self.bootstrap(ct, _server_key).unwrap())
+                .collect();
+            // println!(
+            //     "{:?} SW bootstraps: {:?} ",
+            //     ciphertexts.len(),
+            //     start.elapsed()
+            // );
+            result
+        };
+
+        #[cfg(feature = "fpga")]
+        let bootstrapped: Vec<LweCiphertextOwned<u32>> = if !self.is_fpga_enabled {
+            // let start = Instant::now();
+            let result: Vec<LweCiphertextOwned<u32>> = ciphertexts
+                .iter_mut()
+                .map(|ct| self.bootstrap(ct, _server_key).unwrap())
+                .collect();
+            // println!(
+            //     "{:?} SW bootstraps: {:?} ",
+            //     ciphertexts.len(),
+            //     start.elapsed()
+            // );
+            result
+        } else {
+            assert!(ciphertexts.len() <= FPGA_BOOTSTRAP_PACKING);
+
+            fn alternate_extract_lwe_sample_from_glwe_ciphertext(
+                input_glwe: &GlweCiphertext<Vec<u32>>,
+                output_lwe: &mut LweCiphertext<Vec<u32>>,
+                mut nth: usize,
+            ) {
+                // We retrieve the bodies and masks of the two ciphertexts.
+                let (mut lwe_mask, lwe_body) = output_lwe.get_mut_mask_and_body();
+                let (glwe_mask, glwe_body) = input_glwe.get_mask_and_body();
+
+                nth = nth % (2 * input_glwe.polynomial_size().0);
+
+                // We copy the body
+                *lwe_body.data = if nth >= input_glwe.polynomial_size().0 {
+                    u32::MAX - glwe_body.as_ref()[nth % input_glwe.polynomial_size().0]
+                } else {
+                    glwe_body.as_ref()[nth % input_glwe.polynomial_size().0]
+                };
+
+                // We copy the mask (each polynomial is in the wrong order)
+                lwe_mask.as_mut().copy_from_slice(glwe_mask.as_ref());
+
+                // We loop through the polynomials
+                for lwe_mask_poly in lwe_mask.as_mut().chunks_mut(input_glwe.polynomial_size().0) {
+                    let mut poly: Polynomial<&mut [u32]> =
+                        Polynomial::from_container(lwe_mask_poly);
+                    // We reverse the polynomial
+                    poly.reverse();
+                    // We do the final monomial mul
+                    polynomial_wrapping_monic_monomial_mul_assign(
+                        &mut poly,
+                        MonomialDegree(nth + glwe_mask.polynomial_size().0 + 1),
+                    );
+                }
+            }
+
+            let mut lwe_out = [[0u32;
+                DEMO_PARAMETERS.polynomial_size.0 * (DEMO_PARAMETERS.glwe_dimension.0 + 1)];
+                FPGA_BOOTSTRAP_PACKING];
+
+            let modulus_switch = |num: &u32| -> u32 {
+                pbs_modulus_switch(
+                    *num,
+                    DEMO_PARAMETERS.polynomial_size,
+                    ModulusSwitchOffset(0),
+                    LutCountLog(0),
+                ) as u32
+            };
+
+            // ! cts_mask is passed to the FPGA and needs to be contiguous memory
+            let cts_mask: Vec<[u32; DEMO_PARAMETERS.lwe_dimension.0]> = ciphertexts
+                .iter()
+                .map(|ct| {
+                    ct.get_mask()
+                        .as_ref()
+                        .iter()
+                        .map(modulus_switch)
+                        .collect::<Vec<u32>>()
+                        .try_into()
+                        .unwrap()
+                })
+                .collect();
+
+            let ciphertext_moduluses: Vec<CiphertextModulus<u32>> = ciphertexts
+                .iter()
+                .map(|ct| ct.ciphertext_modulus())
+                .collect();
+
+            let cts_bodies: Vec<u32> = ciphertexts
+                .iter()
+                .map(|ct| modulus_switch(ct.get_body().data))
+                .collect();
+
+            unsafe {
+                // Write Input
+                xrtBOWrite(
+                    self.mem_lwe_in,
+                    cts_mask.as_ptr() as *const c_void,
+                    MEM_LWE_IN_SIZE,
+                    0,
+                );
+                xrtBOSync(
+                    self.mem_lwe_in,
+                    xclBOSyncDirection_XCL_BO_SYNC_BO_TO_DEVICE,
+                    MEM_LWE_IN_SIZE,
+                    0,
+                );
+
+                // Kernel Run
+                // let start = Instant::now();
+                xrtRunStart(self.runner_krnl);
+                xrtRunWait(self.runner_krnl);
+                // println!(
+                //     "{:?} FPGA bootstraps: {:?} ",
+                //     ciphertexts.len(),
+                //     start.elapsed()
+                // );
+
+                // Read Output
+                xrtBOSync(
+                    self.mem_lwe_out,
+                    xclBOSyncDirection_XCL_BO_SYNC_BO_FROM_DEVICE,
+                    MEM_LWE_OUT_SIZE,
+                    0,
+                );
+
+                xrtBORead(
+                    self.mem_lwe_out,
+                    lwe_out.as_mut_ptr() as *mut c_void,
+                    MEM_LWE_OUT_SIZE,
+                    0,
+                );
+            }
+
+            let mut result = Vec::<LweCiphertextOwned<u32>>::new();
+
+            for (slot, body, modulus) in itertools::izip!(lwe_out, cts_bodies, ciphertext_moduluses)
+            {
+                let mut pbs_result = LweCiphertext::new(
+                    0u32,
+                    LweDimension(
+                        DEMO_PARAMETERS.glwe_dimension.0 * DEMO_PARAMETERS.polynomial_size.0,
+                    )
+                    .to_lwe_size(),
+                    modulus,
+                );
+                let mut input_glwe = GlweCiphertext::from_container(
+                    slot.to_vec(),
+                    DEMO_PARAMETERS.polynomial_size,
+                    modulus,
+                );
+                alternate_extract_lwe_sample_from_glwe_ciphertext(
+                    &mut input_glwe,
+                    &mut pbs_result,
+                    body as usize,
+                );
+                result.push(pbs_result);
+            }
+
+            unsafe {
+                result.set_len(ciphertexts.len());
+            }
+            result
+        };
+
+        #[cfg(feature = "without_keyswitch")]
+        let result = bootstrapped
+            .iter()
+            .map(|ct| Ciphertext::Encrypted(ct.clone()))
+            .collect();
+
+        #[cfg(not(feature = "without_keyswitch"))]
+        let result = {
+            // let start = Instant::now();
+            let result = bootstrapped
+                .iter()
+                .map(|ct| Ciphertext::Encrypted(self.keyswitch(ct, _server_key).unwrap()))
+                .collect();
+            // print!(
+            //     "{:?} SW keyswitches: {:?}",
+            //     ciphertexts.len(),
+            //     start.elapsed()
+            // );
+            result
+        };
+
+        result
     }
 
     pub(crate) fn bootstrap_keyswitch(

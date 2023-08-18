@@ -2,6 +2,7 @@
 
 use crate::core_crypto::commons::parameters::*;
 use crate::core_crypto::commons::traits::*;
+use std::ops::{Deref, DerefMut};
 use std::ops::{Index, IndexMut};
 
 /// A [`polynomial`](`Polynomial`).
@@ -145,6 +146,20 @@ where
     /// See [`Polynomial::from_container`] for usage.
     pub fn new(fill_with: Scalar, polynomial_size: PolynomialSize) -> PolynomialOwned<Scalar> {
         PolynomialOwned::from_container(vec![fill_with; polynomial_size.0])
+    }
+}
+
+impl<C: Container> Deref for Polynomial<C> {
+    type Target = [C::Element];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl<C: ContainerMut> DerefMut for Polynomial<C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut()
     }
 }
 

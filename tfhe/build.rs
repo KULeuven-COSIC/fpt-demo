@@ -1,8 +1,10 @@
+extern crate bindgen;
+
+use std::env;
+use std::path::PathBuf;
+
 #[cfg(feature = "__c_api")]
 fn gen_c_api() {
-    use std::env;
-    use std::path::PathBuf;
-
     if std::env::var("_CBINDGEN_IS_RUNNING").is_ok() {
         return;
     }
@@ -61,5 +63,26 @@ fn gen_c_api() {
 
 fn main() {
     #[cfg(feature = "__c_api")]
-    gen_c_api()
+    gen_c_api();
+
+    // Tell cargo to look for shared libraries in the specified directory
+    println!("cargo:rustc-link-search=/opt/xilinx/xrt/lib");
+
+    // Tell cargo to tell rustc to link the system xrt libraries
+    // shared library.
+    println!("cargo:rustc-link-lib=xrt_coreutil");
+
+    // Tell cargo to invalidate the built crate whenever the wrapper changes
+    println!("cargo:rerun-if-changed=wrapper.h");
+
+    let bindings = bindgen::Builder::default()
+        .header("wrapper.h")
+        .clang_arg("-I/opt/xilinx/xrt/include")
+        .generate()
+        .expect("Unable to generate bindings");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
 }

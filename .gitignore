@@ -1,6 +1,7 @@
 target/
 .idea/
 .vscode/
+testvectors/
 
 # Path we use for internal-keycache during tests
 ./keys/
