@@ -29,7 +29,7 @@ This demo (`/demos/game-of-life/`) runs the Game of Life over TFHE with or witho
 
 The screenrecording below shows the acceleration of FPT (on the right) over the native version on `TFHE-rs` (on the left). Note that, FPT's acceleration is more capable than seen in this video; however, a reduced parameter set is preferred here to have the software version updates the frames in acceptable time.
 
-<img src="demos/game-of-life/FPT.mp4" width="100%">
+https://github.com/KULeuven-COSIC/fpt-demo/assets/4849663/986be471-ae75-441b-8a15-f84a0508949a
 
 In running Game of Life over TFHE, the server receives an encrypted initial board configuration with encrypted cell states. Update rules are translated into Boolean equations, which are calculated by the server using encrypted gate arithmetic. Updating a single cell state requires exactly 44 encrypted gate computations, disregarding the cheaper NOT gates that do not include a bootstrap. As a whole, the encrypted Game of Life consists of a mix of homomorphic AND, XOR, OR, and NOT gates. These operations and their parallel computation should help estimating FPT's performance on a variety of applications. In addition, this is an application which demonstrates the performance improvements live: the FPGA-accelerated board updates visually appear much quicker than the software counterpart.
 
