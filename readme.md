@@ -1,8 +1,8 @@
 # FPT: a Fixed-Point Accelerator for Torus Fully Homomorphic Encryption
 
-FPT accelerates the bootstrapiing operations on FPGA. 
+FPT accelerates the TFHE bootstrapping operation on FPGA. 
 
-This repository provides a demo of FPT's performance improvements over the [Conway's Game-of-Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) implemented with [TFHE-rs](https://github.com/zama-ai/tfhe-rs/). The code in this repo is a fork of TFHE-rs, extending it with the use of FPT and with the demos implemented in `/demo` folder.
+This repository provides a demo of FPT's performance improvements over an encrypted version of [Conway's Game-of-Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) implemented with [TFHE-rs](https://github.com/zama-ai/tfhe-rs/). The code in this repo is a fork of TFHE-rs, extending it with the use of FPT and with the demos implemented in `/demo` folder.
 
 The design of FPT will be published at ACM CCS 2023.</br>
 *(Link to the paper and how to cite will be shared when they become available.)*
@@ -27,12 +27,14 @@ FPT is fully implemented and evaluated as a bootstrapping FPGA kernel for an Alv
 
 This demo (`/demos/game-of-life/`) runs the Game of Life over TFHE with or without FPGA acceleration.
 
-The screenrecording below shows the acceleration of FPT (on the right) over the native version on `TFHE-rs` (on the left). Note that, FPT's acceleration is more capable than seen in this video; however, a reduced parameter set is preferred here to have the software version updates the frames in acceptable time.
+The screen recording below shows the acceleration of FPT (on the right) over the native version on `TFHE-rs` (on the left). Note that, FPT's acceleration is more capable than seen in this video; however, a reduced parameter set is preferred here to have the software version update the frames in acceptable time.
 
 https://github.com/KULeuven-COSIC/fpt-demo/assets/4849663/73bd6242-6e77-44d4-9287-ad7d17e965f7
 
 In running Game of Life over TFHE, the server receives an encrypted initial board configuration with encrypted cell states. Update rules are translated into Boolean equations, which are calculated by the server using encrypted gate arithmetic. Updating a single cell state requires exactly 44 encrypted gate computations, disregarding the cheaper NOT gates that do not include a bootstrap. As a whole, the encrypted Game of Life consists of a mix of homomorphic AND, XOR, OR, and NOT gates. These operations and their parallel computation should help estimating FPT's performance on a variety of applications. In addition, this is an application which demonstrates the performance improvements live: the FPGA-accelerated board updates visually appear much quicker than the software counterpart.
 
-For the demo purposes, FPT is made available on [AWS F1 instances](https://aws.amazon.com/ec2/instance-types/f1/). As note above, this demo version prefers a reduced parameter set to have the software version of the board update the frames in acceptable time.
+## Running the Demo of Conway's Game of Life
 
-The description of how to run the demos are detailed in [`demos/readme.md`](demos/readme.md).
+To run the demo yourself, FPT is made available on [AWS F1 instances](https://aws.amazon.com/ec2/instance-types/f1/). As noted above, this demo version prefers a reduced parameter set to have the software version of the board update the frames in acceptable time.
+
+The description of how to run this demo yourself is detailed in [`demos/readme.md`](demos/readme.md).
