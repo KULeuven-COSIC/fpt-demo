@@ -6,7 +6,7 @@
 
 ## Instantiate an F1 Instance
 
-Instantiate an `f1.2xlarge` instance with FPGA Developer AMI. This AMI is not free of charge, but it is easier to work with for short time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md)..
+Instantiate an `f1.2xlarge` instance with FPGA Developer AMI. This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
 
 ## Preparation
 
@@ -22,7 +22,7 @@ ___
 
 Next, we will install Rust for compiling `tfhe-rs`. 
 
-First, we should install address a few dependencies.
+First, we should install a few dependencies.
 
 Install `alsa`:
 ```
@@ -42,7 +42,7 @@ rm RUSTUP.sh
 source "$HOME/.cargo/env"
 ```
 
-The demo uses `nightly` version of Rust, hence switch to that version:
+The demo uses the `nightly` version of Rust, hence switch to that version:
 ```
 rustup toolchain install nightly
 rustup default nightly
@@ -57,7 +57,7 @@ git clone https://github.com/aws/aws-fpga.git $AWS_DIR
 
 ## Source the libraries
 
-With the below commands, you need to make the binaries and libraries accesible for compiling the demo application.
+With the below commands, you need to make the binaries and libraries accessible for compiling the demo application.
 
 ```bash
 scl enable llvm-toolset-7 bash
