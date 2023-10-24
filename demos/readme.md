@@ -1,27 +1,27 @@
 # Demos
 
-In this directory we proide two apps that are used to verify, profile and benchmark the FPT accelerated execution of `TFHE-rs`.
+In this directory, we provide two apps that are used to verify, profile, and benchmark the FPT accelerated execution of `TFHE-rs`.
 
-:exclamation: Remember that, this demo version of the FPT implements only a reduced parameter set to have the software TFHE-rs board updates in acceptable time. The full design is much more capable as described in the paper.
+:exclamation: Remember that, this demo version of the FPT implements only a reduced parameter set to have the software TFHE-rs board updates in acceptable time. The full design is much more capable, as described in the paper.
 
 ## Setup Before Running the Demos
 
-To run the demos, you have to first configure the AWS F1 instances, which is mostly installing AWS and AMD provided drivers. A guide [`aws_f1_setup.md`](aws_f1_setup.md) is provided to described the setup in steps.
+To run the demos, you must first configure the AWS F1 instances. This includes installing AWS and AMD-provided drivers. A guide [`aws_f1_setup.md`](aws_f1_setup.md) is provided to describe the setup in steps.
 
-You should set these two environmental variables, which will indicate the demo the FPGA image of the FPT which will be loaded to the FPGA by the demo code.
+You should set these two environmental variables, which will indicate to the demo where to find the FPGA image of the FPT.
 
 ```bash
 export FPGA_IMAGE="$(pwd)/demos/accel.awsxclbin"
 export FPGA_INDEX=0
 ```
 
-:exclamation: In AWS F1 context, the `accel.awsxclbin` is a container which does not contain the acutal FPGA image, but links to the image hosted by the AWS. It also makes the image subject to access control. If you wish to run this demo, you can drop an email to us with your AWS user ID, and we will grant you access to the image.
+:exclamation: In AWS F1 context, the `accel.awsxclbin` is a container that does not contain the actual FPGA image, but rather links to the image hosted by the AWS. It also makes the image subject to access control. If you wish to run this demo, send us an email with your AWS user ID, and we will grant you access to the image.
 
-Once the setup above are done, you can continue witht the demos below.
+Once the setup above is done, you can continue with the demos below.
 
 ## Demo: FPGA Test
 
-Once AWS F1 instance is setup, this app tests the correctness of FPT, besides allows to benchmark performance etc. 
+Once AWS F1 instance is set up, this app tests the correctness of FPT. It also allows benchmarking performance etc. 
 
 ```bash
 cargo run --release --bin fpga --features fpga
