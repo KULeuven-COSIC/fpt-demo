@@ -1,5 +1,9 @@
 # Setting up the F1 Instance
 
+## Creating an AWS account
+
+:exclamation: A new AWS account may not have the required quota allowance to run a `f1.2xlarge` type instance. If that is the case, one should file a [quota increase request](https://aws.amazon.com/getting-started/hands-on/request-service-quota-increase/) for the `Running On-Demand F instances` service. Make sure to request a limit increase to `8 instances`, since `f1.2xlarge` contains 8 vCPUs. The quota increase may take up to a few days to process.
+
 ## Instantiate an F1 Instance
 
 Instantiate an `f1.2xlarge` instance with FPGA Developer AMI. This AMI is not free of charge, but it is easier to work with for short time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md)..
