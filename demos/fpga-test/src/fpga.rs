@@ -18,15 +18,8 @@ use {std::fs::File, std::io::BufReader, tfhe::boolean::server_key::FpgaGates};
 fn main() {
   let mut boolean_engine = BooleanEngine::new();
 
-  #[cfg(not(feature = "fpga"))]
+  // generate the client key for encrypt/decrypt of messages
   let client_key = boolean_engine.create_client_key(DEMO_PARAMETERS);
-
-  #[cfg(feature = "fpga")]
-  let client_key: ClientKey = {
-    let file = File::open("testvectors/bootstrap/client_key.json").unwrap();
-    let reader = BufReader::new(file);
-    serde_json::from_reader(reader).unwrap()
-  };
 
   // generate the server key, only the SW needs this
   let server_key = boolean_engine.create_server_key(&client_key);
