@@ -6,7 +6,7 @@
 
 ## Instantiate an F1 Instance
 
-Instantiate an `f1.2xlarge` instance with FPGA Developer AMI. This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
+Instantiate an `f1.2xlarge` instance with `FPGA Developer AMI`. (Please note that, the instructions below are NOT prepared for the `Amazon Linux 2` version, or the one from `Community AMI`). This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
 
 ## Preparation
 
@@ -29,9 +29,16 @@ Install `alsa`:
 sudo yum install alsa-lib-devel
 ```
 
+Install `systemd-devel`:
+```
+sudo yum install systemd-devel
+```
+
 This one is to install a newer version of `clang`, the default of which is lower than 3.5, and not compatible:
 ```
+sudo yum install centos-release-scl
 sudo yum install llvm-toolset-7
+scl enable llvm-toolset-7 bash
 ```
 
 Now, install Rust:
@@ -62,6 +69,7 @@ With the below commands, you need to make the binaries and libraries accessible 
 ```bash
 scl enable llvm-toolset-7 bash
 source /opt/xilinx/xrt/setup.sh
+AWS_DIR=~/aws-fpga
 source $AWS_DIR/vitis_runtime_setup.sh
 ```
 
