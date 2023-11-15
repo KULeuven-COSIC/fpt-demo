@@ -8,10 +8,18 @@ In this directory, we provide two apps that are used to verify, profile, and ben
 
 To run the demos, you must first configure the AWS F1 instances. This includes installing AWS and AMD-provided drivers. A guide [`aws_f1_setup.md`](aws_f1_setup.md) is provided to describe the setup in steps.
 
+Let's clone this repository:
+
+```bash
+FPT_DIR=~/fpt-demo
+git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR --branch fpt-demo
+cd $FPT_DIR
+```
+
 You should set these two environmental variables, which will indicate to the demo where to find the FPGA image of the FPT.
 
 ```bash
-export FPGA_IMAGE="$(pwd)/demos/accel.awsxclbin"
+export FPGA_IMAGE="$FPT_DIR/demos/accel.awsxclbin"
 export FPGA_INDEX=0
 ```
 
