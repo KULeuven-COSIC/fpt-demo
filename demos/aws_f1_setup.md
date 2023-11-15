@@ -4,6 +4,8 @@
 
 :exclamation: A new AWS account may not have the required quota allowance to run a `f1.2xlarge` type instance. If that is the case, one should file a [quota increase request](https://aws.amazon.com/getting-started/hands-on/request-service-quota-increase/) for the `Running On-Demand F instances` service. Make sure to request a limit increase to `8 instances`, since `f1.2xlarge` contains 8 vCPUs. The quota increase may take up to a few days to process.
 
+In your communication to AWS, please pay attention that the F1 access permissions are tied to a given region. Though we provide the demo application in this repository, the actual FPGA image is hosted by AWS. We make that image publicly available in all the F1 instance regions of today, which are `us-east-1`, `us-west-2`, `eu-west-1`, `ap-southeast-2`, `eu-central-1` and `eu-west-2`. If more regions with F1 instances appear in future, we will make the image available in those regions too. If you notice that we are late to do this, please create an issue.
+
 ## Instantiate an F1 Instance
 
 Instantiate an `f1.2xlarge` instance with `FPGA Developer AMI`. (Please note that, the instructions below are NOT prepared for the `Amazon Linux 2` version, or the one from `Community AMI`). This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
