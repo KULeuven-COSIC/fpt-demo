@@ -6,19 +6,18 @@
 
 use tfhe::boolean::engine::BooleanEngine;
 use tfhe::boolean::prelude::*;
-use tfhe::boolean::PLAINTEXT_FALSE;
-use tfhe::core_crypto::prelude::*;
 
 use rand::{Rng, SeedableRng};
 
 use std::iter::zip;
 #[cfg(feature = "fpga")]
-use {std::fs::File, std::io::BufReader, tfhe::boolean::server_key::FpgaGates};
+use tfhe::boolean::server_key::FpgaGates;
 
 fn main() {
+  const TEST_COUNT: u32 = 10;
+
   let mut boolean_engine = BooleanEngine::new();
 
-  // generate the client key for encrypt/decrypt of messages
   let client_key = boolean_engine.create_client_key(DEMO_PARAMETERS);
 
   // generate the server key, only the SW needs this
@@ -29,43 +28,46 @@ fn main() {
 
   let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
 
-  for test in 0..100 {
-    let mut golden_mouts = Vec::<bool>::new();
-    let mut cts_tmp = Vec::<LweCiphertext<Vec<u32>>>::new();
+  for test in 0..TEST_COUNT {
+    let mut lefts = Vec::<bool>::new();
+    let mut rights = Vec::<bool>::new();
+    let mut outputs = Vec::<bool>::new();
+
+    let mut lefts_ct = Vec::<Ciphertext>::new();
+    let mut rights_ct = Vec::<Ciphertext>::new();
+
     for _ in 0..FPGA_BOOTSTRAP_PACKING {
-      let (m1, m2) = (rng.gen_range(0..=1) != 0, rng.gen_range(0..=1) != 0);
-      let mout = m1 && m2;
-      let ct_left = boolean_engine.encrypt(m1, &client_key);
-      let ct_right = boolean_engine.encrypt(m2, &client_key);
+      let l = rng.gen_range(0..=1) != 0;
+      let r = rng.gen_range(0..=1) != 0;
 
-      if let (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) =
-        (&ct_left, &ct_right)
-      {
-        let mut ct_tmp =
-          LweCiphertext::new(0u32, ct_left_ct.lwe_size(), ct_left_ct.ciphertext_modulus());
+      let l_ct = boolean_engine.encrypt(l, &client_key);
+      let r_ct = boolean_engine.encrypt(r, &client_key);
 
-        // compute the linear combination for AND: ct_left + ct_right + (0,...,0,-1/8)
-        // ct_left + ct_right
-        lwe_ciphertext_add(&mut ct_tmp, ct_left_ct, ct_right_ct);
-        let cst = Plaintext(PLAINTEXT_FALSE);
-        // - 1/8
-        lwe_ciphertext_plaintext_add_assign(&mut ct_tmp, cst);
+      lefts.push(l);
+      rights.push(r);
+      outputs.push(l && r);
 
-        cts_tmp.push(ct_tmp);
-        golden_mouts.push(mout);
+      lefts_ct.push(l_ct);
+      rights_ct.push(r_ct);
+    }
+
+    let outputs_ct = server_key.and_packed(&lefts_ct, &rights_ct);
+
+    let mut success = true;
+    for (output, ct_output) in zip(outputs, outputs_ct) {
+      let expected: bool = output;
+      let calculated: bool = client_key.decrypt(&ct_output);
+
+      if expected != calculated {
+        success = false;
       }
     }
 
-    // fpga
-    let pbs_results = boolean_engine
-      .bootstrapper
-      .bootstrap_and_keyswitch_packed(&mut cts_tmp, &server_key);
-
-    for (pbs_result, mout) in zip(pbs_results, golden_mouts) {
-      let result = boolean_engine.decrypt(&pbs_result, &client_key);
-      assert_eq!(result, mout);
+    if success {
+      println!("TEST {} PASSED", test);
+    } else {
+      println!("TEST {} FAILED", test);
     }
-
-    println!("TEST {} PASSED", test);
   }
+
 }
