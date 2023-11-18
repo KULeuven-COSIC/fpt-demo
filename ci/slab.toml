@@ -1,16 +1,16 @@
 [profile.cpu-big]
 region = "eu-west-3"
-image_id = "ami-04deffe45b5b236fd"
+image_id = "ami-0ab73f5bd11708a85"
 instance_type = "m6i.32xlarge"
 
 [profile.cpu-small]
 region = "eu-west-3"
-image_id = "ami-04deffe45b5b236fd"
+image_id = "ami-0ab73f5bd11708a85"
 instance_type = "m6i.4xlarge"
 
 [profile.bench]
 region = "eu-west-3"
-image_id = "ami-04deffe45b5b236fd"
+image_id = "ami-0ab73f5bd11708a85"
 instance_type = "m6i.metal"
 
 [command.cpu_test]
@@ -38,10 +38,25 @@ workflow = "aws_tfhe_fast_tests.yml"
 profile = "cpu-big"
 check_run_name = "CPU AWS Fast Tests"
 
+[command.integer_full_bench]
+workflow = "integer_full_benchmark.yml"
+profile = "bench"
+check_run_name = "Integer CPU AWS Benchmarks Full Suite"
+
 [command.integer_bench]
 workflow = "integer_benchmark.yml"
 profile = "bench"
 check_run_name = "Integer CPU AWS Benchmarks"
+
+[command.integer_multi_bit_bench]
+workflow = "integer_multi_bit_benchmark.yml"
+profile = "bench"
+check_run_name = "Integer multi bit CPU AWS Benchmarks"
+
+[command.shortint_full_bench]
+workflow = "shortint_full_benchmark.yml"
+profile = "bench"
+check_run_name = "Shortint CPU AWS Benchmarks Full Suite"
 
 [command.shortint_bench]
 workflow = "shortint_benchmark.yml"

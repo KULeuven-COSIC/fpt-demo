@@ -1,6 +1,6 @@
-use crate::core_crypto::prelude::UnsignedInteger;
 use crate::integer::block_decomposition::DecomposableInto;
 use crate::integer::ciphertext::RadixCiphertext;
+use crate::integer::server_key::radix::scalar_sub::TwosComplementNegation;
 use crate::integer::ServerKey;
 
 impl ServerKey {
@@ -10,11 +10,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 165;
     /// let scalar = 112;
@@ -34,7 +34,7 @@ impl ServerKey {
         scalar: T,
     ) -> RadixCiphertext
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: TwosComplementNegation + DecomposableInto<u8>,
     {
         if !self.is_scalar_sub_possible(ct, scalar) {
             self.full_propagate_parallelized(ct);
@@ -44,7 +44,7 @@ impl ServerKey {
 
     pub fn smart_scalar_sub_assign_parallelized<T>(&self, ct: &mut RadixCiphertext, scalar: T)
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: TwosComplementNegation + DecomposableInto<u8>,
     {
         if !self.is_scalar_sub_possible(ct, scalar) {
             self.full_propagate_parallelized(ct);
@@ -67,11 +67,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 165;
     /// let scalar = 112;
@@ -87,7 +87,7 @@ impl ServerKey {
     /// ```
     pub fn scalar_sub_parallelized<T>(&self, ct: &RadixCiphertext, scalar: T) -> RadixCiphertext
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: TwosComplementNegation + DecomposableInto<u8>,
     {
         let mut ct_res = ct.clone();
         self.scalar_sub_assign_parallelized(&mut ct_res, scalar);
@@ -96,7 +96,7 @@ impl ServerKey {
 
     pub fn scalar_sub_assign_parallelized<T>(&self, ct: &mut RadixCiphertext, scalar: T)
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: TwosComplementNegation + DecomposableInto<u8>,
     {
         if !ct.block_carries_are_empty() {
             self.full_propagate_parallelized(ct);

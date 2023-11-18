@@ -40,7 +40,7 @@ mkdir -p "${TFHE_BUILD_DIR}"
 
 cd "${TFHE_BUILD_DIR}"
 
-cmake .. -DCMAKE_BUILD_TYPE=RELEASE
+cmake .. -DCMAKE_BUILD_TYPE=RELEASE -DCARGO_PROFILE="${CARGO_PROFILE}"
 
 make -j
 
@@ -56,4 +56,4 @@ if [[ $(uname) == "Darwin" ]]; then
 fi
 
 # Let's go parallel
-ARGS="-j$("${nproc_bin}")" make test
+ARGS="-j$(${nproc_bin})" make test

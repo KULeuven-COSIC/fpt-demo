@@ -14,6 +14,8 @@ BIG_TESTS_INSTANCE?=FALSE
 GEN_KEY_CACHE_MULTI_BIT_ONLY?=FALSE
 PARSE_INTEGER_BENCH_CSV_FILE?=tfhe_rs_integer_benches.csv
 FAST_TESTS?=FALSE
+FAST_BENCH?=FALSE
+BENCH_OP_FLAVOR?=DEFAULT
 # This is done to avoid forgetting it, we still precise the RUSTFLAGS in the commands to be able to
 # copy paste the command in the terminal and change them if required without forgetting the flags
 export RUSTFLAGS?=-C target-cpu=native
@@ -139,7 +141,7 @@ clippy_tasks:
 .PHONY: clippy_all_targets # Run clippy lints on all targets (benches, examples, etc.)
 clippy_all_targets:
 	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy --all-targets \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer \
 		-p tfhe -- --no-deps -D warnings
 
 .PHONY: clippy_all # Run all clippy targets
@@ -197,7 +199,7 @@ build_tfhe_full: install_rs_build_toolchain
 .PHONY: build_c_api # Build the C API for boolean, shortint and integer
 build_c_api: install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
-		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api,high-level-c-api \
+		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api,high-level-c-api, \
 		-p tfhe
 
 .PHONY: build_c_api_experimental_deterministic_fft # Build the C API for boolean, shortint and integer with experimental deterministic FFT
@@ -243,27 +245,33 @@ test_boolean: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),boolean -p tfhe -- boolean::
 
-.PHONY: test_c_api # Run the tests for the C API
-test_c_api: install_rs_check_toolchain 
+.PHONY: test_c_api_rs # Run the rust tests for the C API
+test_c_api_rs: install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api,high-level-c-api \
 		-p tfhe \
 		c_api
-	
-	"$(MAKE)" build_c_api
+
+.PHONY: test_c_api_c # Run the C tests for the C API
+test_c_api_c: build_c_api
 	./scripts/c_api_tests.sh
+
+.PHONY: test_c_api # Run all the tests for the C API
+test_c_api: test_c_api_rs test_c_api_c
 
 .PHONY: test_shortint_ci # Run the tests for shortint ci
 test_shortint_ci: install_rs_build_toolchain install_cargo_nextest
 	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
 	FAST_TESTS="$(FAST_TESTS)" \
-		./scripts/shortint-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN)
+		./scripts/shortint-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) \
+		--cargo-profile "$(CARGO_PROFILE)"
 
 .PHONY: test_shortint_multi_bit_ci # Run the tests for shortint ci running only multibit tests
 test_shortint_multi_bit_ci: install_rs_build_toolchain install_cargo_nextest
 	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
 	FAST_TESTS="$(FAST_TESTS)" \
-		./scripts/shortint-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) --multi-bit
+		./scripts/shortint-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) \
+		--cargo-profile "$(CARGO_PROFILE)" --multi-bit
 
 .PHONY: test_shortint # Run all the tests for shortint
 test_shortint: install_rs_build_toolchain
@@ -274,13 +282,15 @@ test_shortint: install_rs_build_toolchain
 test_integer_ci: install_rs_build_toolchain install_cargo_nextest
 	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
 	FAST_TESTS="$(FAST_TESTS)" \
-		./scripts/integer-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN)
+		./scripts/integer-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) \
+		--cargo-profile "$(CARGO_PROFILE)"
 
 .PHONY: test_integer_multi_bit_ci # Run the tests for integer ci running only multibit tests
 test_integer_multi_bit_ci: install_rs_build_toolchain install_cargo_nextest
 	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
 	FAST_TESTS="$(FAST_TESTS)" \
-		./scripts/integer-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) --multi-bit
+		./scripts/integer-tests.sh --rust-toolchain $(CARGO_RS_BUILD_TOOLCHAIN) \
+		--cargo-profile "$(CARGO_PROFILE)" --multi-bit
 
 .PHONY: test_integer # Run all the tests for integer
 test_integer: install_rs_build_toolchain
@@ -290,7 +300,8 @@ test_integer: install_rs_build_toolchain
 .PHONY: test_high_level_api # Run all the tests for high_level_api
 test_high_level_api: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe -- high_level_api::
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe \
+		-- high_level_api::
 
 .PHONY: test_user_doc # Run tests from the .md documentation
 test_user_doc: install_rs_build_toolchain
@@ -327,12 +338,21 @@ test_kreyvium: install_rs_build_toolchain
 
 .PHONY: doc # Build rust doc
 doc: install_rs_check_toolchain
-	RUSTDOCFLAGS="--html-in-header katex-header.html -Dwarnings" \
+	RUSTDOCFLAGS="--html-in-header katex-header.html" \
 	cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" doc \
 		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer --no-deps
 
 .PHONY: docs # Build rust doc alias for doc
 docs: doc
+
+.PHONY: lint_doc # Build rust doc with linting enabled
+lint_doc: install_rs_check_toolchain
+	RUSTDOCFLAGS="--html-in-header katex-header.html -Dwarnings" \
+	cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" doc \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer --no-deps
+
+.PHONY: lint_docs # Build rust doc with linting enabled alias for lint_doc
+lint_docs: lint_doc
 
 .PHONY: format_doc_latex # Format the documentation latex equations to avoid broken rendering.
 format_doc_latex:
@@ -380,21 +400,17 @@ test_web_js_api_parallel: build_web_js_api_parallel
 
 .PHONY: ci_test_web_js_api_parallel # Run tests for the web wasm api
 ci_test_web_js_api_parallel: build_web_js_api_parallel
-	# Auto-retry since WASM tests can be flaky
-	@for i in 1 2 3 ; do \
-		source ~/.nvm/nvm.sh && \
-		nvm use node && \
-		$(MAKE) -C tfhe/web_wasm_parallel_tests test-ci | tee web_js_tests_output; \
-		if grep -q -i "timeout" web_js_tests_output; then \
-			echo "Timeout occurred starting attempt #${i}"; \
-		else \
-			break; \
-		fi; \
-	done
+	source ~/.nvm/nvm.sh && \
+	nvm use node && \
+	$(MAKE) -C tfhe/web_wasm_parallel_tests test-ci
 
 .PHONY: no_tfhe_typo # Check we did not invert the h and f in tfhe
 no_tfhe_typo:
 	@./scripts/no_tfhe_typo.sh
+
+.PHONY: no_dbg_log # Check we did not leave dbg macro calls in the rust code
+no_dbg_log:
+	@./scripts/no_dbg_calls.sh
 
 #
 # Benchmarks
@@ -402,13 +418,23 @@ no_tfhe_typo:
 
 .PHONY: bench_integer # Run benchmarks for integer
 bench_integer: install_rs_check_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
+	RUSTFLAGS="$(RUSTFLAGS)" __TFHE_RS_BENCH_OP_FLAVOR=$(BENCH_OP_FLAVOR) __TFHE_RS_FAST_BENCH=$(FAST_BENCH) \
+	cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
 	--bench integer-bench \
-	--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache,$(AVX512_FEATURE) -p tfhe
+	--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache,$(AVX512_FEATURE) -p tfhe --
+
+.PHONY: bench_integer_multi_bit # Run benchmarks for integer using multi-bit parameters
+bench_integer_multi_bit: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" __TFHE_RS_BENCH_TYPE=MULTI_BIT \
+	__TFHE_RS_BENCH_OP_FLAVOR=$(BENCH_OP_FLAVOR) __TFHE_RS_FAST_BENCH=$(FAST_BENCH) \
+	cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
+	--bench integer-bench \
+	--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache,$(AVX512_FEATURE) -p tfhe --
 
 .PHONY: bench_shortint # Run benchmarks for shortint
 bench_shortint: install_rs_check_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
+	RUSTFLAGS="$(RUSTFLAGS)" __TFHE_RS_BENCH_OP_FLAVOR=$(BENCH_OP_FLAVOR) \
+	cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
 	--bench shortint-bench \
 	--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache,$(AVX512_FEATURE) -p tfhe
 
@@ -469,6 +495,12 @@ parse_wasm_benchmarks: install_rs_check_toolchain
 	--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache \
 	-- web_wasm_parallel_tests/test/benchmark_results
 
+.PHONY: write_params_to_file # Gather all crypto parameters into a file with a Sage readable format.
+write_params_to_file: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) run --profile $(CARGO_PROFILE) \
+	--example write_params_to_file \
+	--features=$(TARGET_ARCH_FEATURE),boolean,shortint,internal-keycache
+
 #
 # Real use case examples
 #
@@ -494,10 +526,10 @@ sha256_bool: install_rs_check_toolchain
 	--features=$(TARGET_ARCH_FEATURE),boolean
 
 .PHONY: pcc # pcc stands for pre commit checks
-pcc: no_tfhe_typo check_fmt doc clippy_all check_compile_tests
+pcc: no_tfhe_typo no_dbg_log check_fmt lint_doc clippy_all check_compile_tests
 
 .PHONY: fpcc # pcc stands for pre commit checks, the f stands for fast
-fpcc: no_tfhe_typo check_fmt doc clippy_fast check_compile_tests
+fpcc: no_tfhe_typo no_dbg_log check_fmt lint_doc clippy_fast check_compile_tests
 
 .PHONY: conformance # Automatically fix problems that can be fixed
 conformance: fmt

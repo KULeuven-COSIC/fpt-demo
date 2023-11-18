@@ -6,7 +6,7 @@
 #![cfg_attr(feature = "nightly-avx512", feature(stdsimd, avx512_target_feature))]
 #![cfg_attr(all(doc, not(doctest)), feature(doc_auto_cfg))]
 #![cfg_attr(all(doc, not(doctest)), feature(doc_cfg))]
-#![deny(rustdoc::broken_intra_doc_links)]
+#![warn(rustdoc::broken_intra_doc_links)]
 
 #[cfg(feature = "__c_api")]
 pub mod c_api;
@@ -55,5 +55,10 @@ mod test_user_docs;
 /// cbindgen:ignore
 #[cfg(any(feature = "boolean", feature = "shortint", feature = "integer"))]
 pub(crate) mod high_level_api;
+
 #[cfg(any(feature = "boolean", feature = "shortint", feature = "integer"))]
 pub use high_level_api::*;
+
+/// cbindgen:ignore
+#[cfg(any(test, doctest, feature = "internal-keycache"))]
+pub mod keycache;

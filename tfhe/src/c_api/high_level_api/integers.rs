@@ -1,8 +1,8 @@
 use crate::c_api::high_level_api::keys::{ClientKey, CompactPublicKey, PublicKey};
 use crate::high_level_api::prelude::*;
 use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Mul, MulAssign,
-    Neg, Not, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
+    Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 use crate::c_api::high_level_api::u128::U128;
@@ -17,12 +17,143 @@ macro_rules! impl_operations_for_integer_type {
         name: $name:ident,
         clear_scalar_type: $clear_scalar_type:ty
     ) => {
-        impl_binary_fn_on_type!($name => add, sub, mul, bitand, bitor, bitxor, shl, shr, eq, ne, ge, gt, le, lt, min, max);
-        impl_binary_assign_fn_on_type!($name => add_assign, sub_assign, mul_assign, bitand_assign, bitor_assign, bitxor_assign, shl_assign, shr_assign);
-        impl_scalar_binary_fn_on_type!($name, $clear_scalar_type => add, sub, mul, shl, shr, eq, ne, ge, gt, le, lt, min, max);
-        impl_scalar_binary_assign_fn_on_type!($name, $clear_scalar_type => add_assign, sub_assign, mul_assign, shl_assign, shr_assign);
+        impl_binary_fn_on_type!($name =>
+            add,
+            sub,
+            mul,
+            bitand,
+            bitor,
+            bitxor,
+            shl,
+            shr,
+            eq,
+            ne,
+            ge,
+            gt,
+            le,
+            lt,
+            min,
+            max,
+            div,
+            rem,
+        );
+        impl_binary_assign_fn_on_type!($name =>
+            add_assign,
+            sub_assign,
+            mul_assign,
+            bitand_assign,
+            bitor_assign,
+            bitxor_assign,
+            shl_assign,
+            shr_assign,
+            div_assign,
+            rem_assign,
+        );
+        impl_scalar_binary_fn_on_type!($name, $clear_scalar_type =>
+            add,
+            sub,
+            mul,
+            bitand,
+            bitor,
+            bitxor,
+            shl,
+            shr,
+            eq,
+            ne,
+            ge,
+            gt,
+            le,
+            lt,
+            min,
+            max,
+            rotate_right,
+            rotate_left,
+            div,
+            rem,
+        );
+        impl_scalar_binary_assign_fn_on_type!($name, $clear_scalar_type =>
+            add_assign,
+            sub_assign,
+            mul_assign,
+            bitand_assign,
+            bitor_assign,
+            bitxor_assign,
+            shl_assign,
+            shr_assign,
+            rotate_right_assign,
+            rotate_left_assign,
+            div_assign,
+            rem_assign,
+        );
 
         impl_unary_fn_on_type!($name => neg, not);
+
+        // Implement div_rem.
+        // We can't use the macro above as div_rem returns a tuple.
+        //
+        // (Having div_rem is important for the cases where you need both
+        // the quotient and remainder as you may save time by using the div_rem
+        // instead of div and rem separately
+        ::paste::paste! {
+            #[no_mangle]
+            pub unsafe extern "C" fn [<$name:snake _scalar_div_rem>](
+                lhs: *const $name,
+                rhs: $clear_scalar_type,
+                q_result: *mut *mut $name,
+                r_result: *mut *mut $name,
+            ) -> c_int {
+                $crate::c_api::utils::catch_panic(|| {
+                    let lhs = $crate::c_api::utils::get_ref_checked(lhs).unwrap();
+                    let rhs = <$clear_scalar_type as $crate::c_api::high_level_api::utils::ToRustScalarType
+                        >::to_rust_scalar_type(rhs);
+
+                    let (q, r) = (&lhs.0).div_rem(rhs);
+
+                    *q_result = Box::into_raw(Box::new($name(q)));
+                    *r_result = Box::into_raw(Box::new($name(r)));
+                })
+            }
+        }
+
+        ::paste::paste! {
+            #[no_mangle]
+            pub unsafe extern "C" fn [<$name:snake _div_rem>](
+                lhs: *const $name,
+                rhs: *const $name,
+                q_result: *mut *mut $name,
+                r_result: *mut *mut $name,
+            ) -> c_int {
+                $crate::c_api::utils::catch_panic(|| {
+                    let lhs = $crate::c_api::utils::get_ref_checked(lhs).unwrap();
+                    let rhs = $crate::c_api::utils::get_ref_checked(rhs).unwrap();
+
+                    let (q, r) = (&lhs.0).div_rem(&rhs.0);
+
+                    *q_result = Box::into_raw(Box::new($name(q)));
+                    *r_result = Box::into_raw(Box::new($name(r)));
+                })
+            }
+        }
+
+        ::paste::paste! {
+            #[no_mangle]
+            pub unsafe extern "C" fn [<$name:snake _if_then_else>](
+                condition_ct: *const $name,
+                then_ct: *const $name,
+                else_ct: *const $name,
+                result: *mut *mut $name,
+            ) -> c_int {
+                $crate::c_api::utils::catch_panic(|| {
+                    let condition_ct = &$crate::c_api::utils::get_ref_checked(condition_ct).unwrap().0;
+                    let then_ct = &$crate::c_api::utils::get_ref_checked(then_ct).unwrap().0;
+                    let else_ct = &$crate::c_api::utils::get_ref_checked(else_ct).unwrap().0;
+
+                    let r = condition_ct.if_then_else(then_ct, else_ct);
+
+                    *result = Box::into_raw(Box::new($name(r)));
+                })
+            }
+        }
     };
 }
 
@@ -121,8 +252,8 @@ create_integer_wrapper_type!(name: FheUint14, clear_scalar_type: u16);
 create_integer_wrapper_type!(name: FheUint16, clear_scalar_type: u16);
 create_integer_wrapper_type!(name: FheUint32, clear_scalar_type: u32);
 create_integer_wrapper_type!(name: FheUint64, clear_scalar_type: u64);
-create_integer_wrapper_type!(name: FheUint128, clear_scalar_type: u64);
-create_integer_wrapper_type!(name: FheUint256, clear_scalar_type: u64);
+create_integer_wrapper_type!(name: FheUint128, clear_scalar_type: U128);
+create_integer_wrapper_type!(name: FheUint256, clear_scalar_type: U256);
 
 impl_decrypt_on_type!(FheUint8, u8);
 impl_try_encrypt_trivial_on_type!(FheUint8{crate::high_level_api::FheUint8}, u8);

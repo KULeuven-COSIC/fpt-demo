@@ -3,10 +3,14 @@ use crate::shortint::prelude::*;
 
 #[test]
 fn gen_multi_keys_test_fresh() {
-    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
-    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
+    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
 
-    let ksk = KeySwitchingKey::new((&ck1, &sk1), (&ck2, &sk2), PARAM_KEYSWITCH_1_1_TO_2_2);
+    let ksk = KeySwitchingKey::new(
+        (&ck1, &sk1),
+        (&ck2, &sk2),
+        PARAM_KEYSWITCH_1_1_KS_PBS_TO_2_2_KS_PBS,
+    );
 
     assert_eq!(ksk.cast_rshift, 2);
 
@@ -49,12 +53,13 @@ fn gen_multi_keys_test_fresh() {
 
 #[test]
 fn gen_multi_keys_test_fresh_2() {
-    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
-    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_3_CARRY_3);
+    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
+    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_3_CARRY_3_KS_PBS);
 
-    let ksk_params = unsafe {
-        ShortintKeySwitchingParameters::new(ck2.parameters.ks_base_log(), ck2.parameters.ks_level())
-    };
+    let ksk_params = ShortintKeySwitchingParameters::new(
+        ck2.parameters.ks_base_log(),
+        ck2.parameters.ks_level(),
+    );
     let ksk = KeySwitchingKey::new((&ck1, &sk1), (&ck2, &sk2), ksk_params);
 
     assert_eq!(ksk.cast_rshift, 4);
@@ -98,10 +103,14 @@ fn gen_multi_keys_test_fresh_2() {
 
 #[test]
 fn gen_multi_keys_test_add_with_overflow() {
-    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
-    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
+    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
 
-    let ksk = KeySwitchingKey::new((&ck1, &sk1), (&ck2, &sk2), PARAM_KEYSWITCH_1_1_TO_2_2);
+    let ksk = KeySwitchingKey::new(
+        (&ck1, &sk1),
+        (&ck2, &sk2),
+        PARAM_KEYSWITCH_1_1_KS_PBS_TO_2_2_KS_PBS,
+    );
 
     // volontary overflow
     let c1 = ck1.encrypt(1);
@@ -120,24 +129,26 @@ fn gen_multi_keys_test_add_with_overflow() {
 
 #[test]
 fn gen_multi_keys_test_no_shift() {
-    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
-    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
+    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
+    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
 
-    let ksk_params = unsafe {
-        ShortintKeySwitchingParameters::new(ck2.parameters.ks_base_log(), ck2.parameters.ks_level())
-    };
+    let ksk_params = ShortintKeySwitchingParameters::new(
+        ck2.parameters.ks_base_log(),
+        ck2.parameters.ks_level(),
+    );
     let ksk = KeySwitchingKey::new((&ck1, &sk1), (&ck2, &sk2), ksk_params);
     assert_eq!(ksk.cast_rshift, 0);
 }
 
 #[test]
 fn gen_multi_keys_test_truncate() {
-    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
-    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
+    let (ck1, sk1) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
+    let (ck2, sk2) = gen_keys(PARAM_MESSAGE_1_CARRY_1_KS_PBS);
 
-    let ksk_params = unsafe {
-        ShortintKeySwitchingParameters::new(ck2.parameters.ks_base_log(), ck2.parameters.ks_level())
-    };
+    let ksk_params = ShortintKeySwitchingParameters::new(
+        ck2.parameters.ks_base_log(),
+        ck2.parameters.ks_level(),
+    );
     let ksk = KeySwitchingKey::new((&ck1, &sk1), (&ck2, &sk2), ksk_params);
     assert_eq!(ksk.cast_rshift, -2);
 

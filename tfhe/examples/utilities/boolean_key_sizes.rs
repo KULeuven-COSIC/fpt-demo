@@ -5,7 +5,7 @@ use crate::utilities::{write_to_json, OperatorType};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use tfhe::boolean::parameters::{DEFAULT_PARAMETERS, TFHE_LIB_PARAMETERS};
+use tfhe::boolean::parameters::{DEFAULT_PARAMETERS, PARAMETERS_ERROR_PROB_2_POW_MINUS_165};
 use tfhe::boolean::{client_key, server_key};
 
 fn write_result(file: &mut File, name: &str, value: usize) {
@@ -17,7 +17,7 @@ fn write_result(file: &mut File, name: &str, value: usize) {
 fn client_server_key_sizes(results_file: &Path) {
     let boolean_params_vec = vec![
         (DEFAULT_PARAMETERS, "DEFAULT_PARAMETERS"),
-        (TFHE_LIB_PARAMETERS, "TFHE_LIB_PARAMETERS"),
+        (PARAMETERS_ERROR_PROB_2_POW_MINUS_165, "TFHE_LIB_PARAMETERS"),
     ];
     File::create(results_file).expect("create results file failed");
     let mut file = OpenOptions::new()
@@ -42,7 +42,7 @@ fn client_server_key_sizes(results_file: &Path) {
         let test_name = format!("boolean_key_sizes_{params_name}_ksk");
 
         write_result(&mut file, &test_name, ksk_size);
-        write_to_json(
+        write_to_json::<u32, _>(
             &test_name,
             *params,
             *params_name,
@@ -62,7 +62,7 @@ fn client_server_key_sizes(results_file: &Path) {
         let test_name = format!("boolean_key_sizes_{params_name}_bsk");
 
         write_result(&mut file, &test_name, bsk_size);
-        write_to_json(
+        write_to_json::<u32, _>(
             &test_name,
             *params,
             *params_name,

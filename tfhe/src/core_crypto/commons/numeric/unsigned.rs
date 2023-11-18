@@ -1,4 +1,4 @@
-use super::{CastFrom, CastInto, Numeric, SignedInteger};
+use super::{CastFrom, CastInto, Numeric, SignedInteger, UnsignedNumeric};
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
@@ -6,7 +6,7 @@ use std::ops::{
 
 /// A trait shared by all the unsigned integer types.
 pub trait UnsignedInteger:
-    Numeric
+    UnsignedNumeric
     + Ord
     + Eq
     + Add<Self, Output = Self>
@@ -72,6 +72,11 @@ pub trait UnsignedInteger:
     fn is_power_of_two(self) -> bool;
     #[must_use]
     fn ilog2(self) -> u32;
+    #[must_use]
+    fn ceil_ilog2(self) -> u32 {
+        // ilog2 returns the rounded down log2
+        self.ilog2() + u32::from(!self.is_power_of_two())
+    }
     /// Return the casting of the current value to the signed type of the same size.
     fn into_signed(self) -> Self::Signed;
     /// Return a bit representation of the integer, where blocks of length `block_length` are
@@ -88,6 +93,9 @@ macro_rules! implement {
             const TWO: Self = 2;
             const MAX: Self = <$Type>::MAX;
         }
+
+        impl UnsignedNumeric for $Type {}
+
         impl UnsignedInteger for $Type {
             type Signed = $SignedType;
             #[inline]

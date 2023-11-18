@@ -9,11 +9,14 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use tfhe::shortint::keycache::NamedParam;
-use tfhe::shortint::parameters::{
-    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK, PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
+use tfhe::keycache::NamedParam;
+use tfhe::shortint::keycache::{
+    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_NAME, PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS_NAME,
 };
-use tfhe::shortint::ClassicPBSParameters;
+use tfhe::shortint::parameters::{
+    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS, PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
+};
+use tfhe::shortint::{ClassicPBSParameters, PBSParameters};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -22,9 +25,9 @@ struct Args {
 }
 
 fn params_from_name(name: &str) -> ClassicPBSParameters {
-    match name.to_lowercase().as_str() {
-        "param_message_2_carry_2_compact_pk" => PARAM_MESSAGE_2_CARRY_2_COMPACT_PK,
-        "param_small_message_2_carry_2_compact_pk" => PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
+    match name.to_uppercase().as_str() {
+        PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_NAME => PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS,
+        PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS_NAME => PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
         _ => panic!("failed to get parameters for name '{name}'"),
     }
 }
@@ -55,11 +58,11 @@ pub fn parse_wasm_benchmarks(results_file: &Path, raw_results_dir: &Path) {
         for (full_name, val) in results_as_json.iter() {
             let name_parts = full_name.split("_mean_").collect::<Vec<_>>();
             let bench_name = name_parts[0];
-            let params = params_from_name(name_parts[1]);
+            let params: PBSParameters = params_from_name(name_parts[1]).into();
             let value_in_ns = (val * 1_000_000_f32) as usize;
 
             write_result(&mut file, full_name, value_in_ns);
-            write_to_json(
+            write_to_json::<u64, _>(
                 full_name,
                 params,
                 params.name(),

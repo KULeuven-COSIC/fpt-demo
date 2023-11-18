@@ -8,12 +8,14 @@ function usage() {
     echo "--help                    Print this message"
     echo "--rust-toolchain          The toolchain to run the tests with default: stable"
     echo "--multi-bit               Run multi-bit tests only: default off"
+    echo "--cargo-profile           The cargo profile used to build tests"
     echo
 }
 
 RUST_TOOLCHAIN="+stable"
 multi_bit=""
 not_multi_bit="_multi_bit"
+cargo_profile="release"
 
 while [ -n "$1" ]
 do
@@ -31,6 +33,11 @@ do
         "--multi-bit" )
             multi_bit="_multi_bit"
             not_multi_bit=""
+            ;;
+
+        "--cargo-profile" )
+            shift
+            cargo_profile="$1"
             ;;
 
         *)
@@ -72,29 +79,29 @@ if [[ "${BIG_TESTS_INSTANCE}" != TRUE ]]; then
         # block pbs are too slow for high params
         # mul_crt_4_4 is extremely flaky (~80% failure)
         # test_wopbs_bivariate_crt_wopbs_param_message generate tables that are too big at the moment
-        # test_integer_smart_mul_param_message_4_carry_4 is too slow
-        # so is test_integer_default_add_sequence_multi_thread_param_message_4_carry_4
+        # test_integer_smart_mul_param_message_4_carry_4_ks_pbs is too slow
+        # so is test_integer_default_add_sequence_multi_thread_param_message_4_carry_4_ks_pbs
         filter_expression="""\
 test(/^integer::.*${multi_bit}/) \
 ${not_multi_bit:+"and not test(~${not_multi_bit})"} \
-and not test(/.*_block_pbs(_base)?_param_message_[34]_carry_[34]$/) \
-and not test(~mul_crt_param_message_4_carry_4) \
-and not test(/.*test_wopbs_bivariate_crt_wopbs_param_message_[34]_carry_[34]$/) \
-and not test(/.*test_integer_smart_mul_param_message_4_carry_4$/) \
-and not test(/.*test_integer_default_add_sequence_multi_thread_param_message_4_carry_4$/)"""
+and not test(/.*_block_pbs(_base)?_param_message_[34]_carry_[34]_ks_pbs$/) \
+and not test(~mul_crt_param_message_4_carry_4_ks_pbs) \
+and not test(/.*test_wopbs_bivariate_crt_wopbs_param_message_[34]_carry_[34]_ks_pbs$/) \
+and not test(/.*test_integer_smart_mul_param_message_4_carry_4_ks_pbs$/) \
+and not test(/.*test_integer_default_add_sequence_multi_thread_param_message_4_carry_4_ks_pbs$/)"""
     else
         # test only fast default operations with only two set of parameters
         filter_expression="""\
 test(/^integer::.*${multi_bit}/) \
 ${not_multi_bit:+"and not test(~${not_multi_bit})"} \
-and test(/.*_default_.*/) \
-and not test(/.*_param_message_[14]_carry_[14]$/) \
-and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3$/)"""
+and test(/.*_default_.*?_param${multi_bit}_message_[2-3]_carry_[2-3]${multi_bit:+"_group_2"}_ks_pbs/) \
+and not test(/.*_param_message_[14]_carry_[14]_ks_pbs$/) \
+and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3_ks_pbs$/)"""
     fi
 
     cargo "${RUST_TOOLCHAIN}" nextest run \
         --tests \
-        --release \
+        --cargo-profile "${cargo_profile}" \
         --package tfhe \
         --profile ci \
         --features="${ARCH_FEATURE}",integer,internal-keycache \
@@ -103,42 +110,42 @@ and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3$/)"""
 
     if [[ "${multi_bit}" == "" ]]; then
         cargo "${RUST_TOOLCHAIN}" test \
-            --release \
+            --profile "${cargo_profile}" \
             --package tfhe \
             --features="${ARCH_FEATURE}",integer,internal-keycache \
             --doc \
-            integer::
+            -- integer::
     fi
 else
     if [[ "${FAST_TESTS}" != TRUE ]]; then
         # block pbs are too slow for high params
         # mul_crt_4_4 is extremely flaky (~80% failure)
         # test_wopbs_bivariate_crt_wopbs_param_message generate tables that are too big at the moment
-        # test_integer_smart_mul_param_message_4_carry_4 is too slow
-        # so is test_integer_default_add_sequence_multi_thread_param_message_4_carry_4
+        # test_integer_smart_mul_param_message_4_carry_4_ks_pbs is too slow
+        # so is test_integer_default_add_sequence_multi_thread_param_message_4_carry_4_ks_pbs
         filter_expression="""\
 test(/^integer::.*${multi_bit}/) \
 ${not_multi_bit:+"and not test(~${not_multi_bit})"} \
-and not test(/.*_block_pbs(_base)?_param_message_[34]_carry_[34]$/) \
-and not test(~mul_crt_param_message_4_carry_4) \
-and not test(/.*test_wopbs_bivariate_crt_wopbs_param_message_[34]_carry_[34]$/) \
-and not test(/.*test_integer_smart_mul_param_message_4_carry_4$/) \
-and not test(/.*test_integer_default_add_sequence_multi_thread_param_message_4_carry_4$/)"""
+and not test(/.*_block_pbs(_base)?_param_message_[34]_carry_[34]_ks_pbs$/) \
+and not test(~mul_crt_param_message_4_carry_4_ks_pbs) \
+and not test(/.*test_wopbs_bivariate_crt_wopbs_param_message_[34]_carry_[34]_ks_pbs$/) \
+and not test(/.*test_integer_smart_mul_param_message_4_carry_4_ks_pbs$/) \
+and not test(/.*test_integer_default_add_sequence_multi_thread_param_message_4_carry_4_ks_pbs$/)"""
     else
         # test only fast default operations with only two set of parameters
         filter_expression="""\
 test(/^integer::.*${multi_bit}/) \
 ${not_multi_bit:+"and not test(~${not_multi_bit})"} \
-and test(/.*_default_.*/) \
-and not test(/.*_param_message_[14]_carry_[14]$/) \
-and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3$/)"""
+and test(/.*_default_.*?_param${multi_bit}_message_[2-3]_carry_[2-3]${multi_bit:+"_group_2"}_ks_pbs/) \
+and not test(/.*_param_message_[14]_carry_[14]_ks_pbs$/) \
+and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3_ks_pbs$/)"""
     fi
 
     num_cpu_threads="$(${nproc_bin})"
     num_threads=$((num_cpu_threads * 2 / 3))
     cargo "${RUST_TOOLCHAIN}" nextest run \
         --tests \
-        --release \
+        --cargo-profile "${cargo_profile}" \
         --package tfhe \
         --profile ci \
         --features="${ARCH_FEATURE}",integer,internal-keycache \
@@ -147,11 +154,11 @@ and not test(/.*default_add_sequence_multi_thread_param_message_3_carry_3$/)"""
 
     if [[ "${multi_bit}" == "" ]]; then
         cargo "${RUST_TOOLCHAIN}" test \
-            --release \
+            --profile "${cargo_profile}" \
             --package tfhe \
             --features="${ARCH_FEATURE}",integer,internal-keycache \
             --doc \
-            integer:: -- --test-threads="$(${nproc_bin})"
+            -- --test-threads="$(${nproc_bin})" integer::
     fi
 fi
 

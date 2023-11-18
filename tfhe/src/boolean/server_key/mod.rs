@@ -12,8 +12,11 @@ use crate::boolean::ciphertext::Ciphertext;
 use crate::boolean::client_key::ClientKey;
 pub use crate::boolean::engine::bootstrapping::{CompressedServerKey, ServerKey};
 use crate::boolean::engine::{
-    BinaryGatesAssignEngine, BinaryGatesEngine, PackedBinaryGatesEngine, FpgaEngine, BooleanEngine, WithThreadLocalEngine,
+    BinaryGatesAssignEngine, BinaryGatesEngine, PackedBinaryGatesEngine, BooleanEngine, WithThreadLocalEngine,
 };
+
+#[cfg(feature = "fpga")]
+use crate::boolean::engine::FpgaEngine;
 
 use super::engine::Gate;
 
@@ -47,8 +50,10 @@ pub trait PackedBinaryBooleanGates<L, R> {
     fn xor_packed(&self, cts_left: &Vec<L>, cts_right: &Vec<R>) -> Vec<Ciphertext>;
 }
 
+#[cfg(feature = "fpga")]
 pub trait FpgaGates {
     fn enable_fpga(&self);
+    fn disable_fpga(&self);
 }
 
 trait DefaultImplementation {
@@ -97,6 +102,7 @@ where
     }
 }
 
+#[cfg(feature = "fpga")]
 impl FpgaGates for ServerKey
 where
     <ServerKey as DefaultImplementation>::Engine: FpgaEngine<ServerKey>,
@@ -104,8 +110,17 @@ where
     fn enable_fpga(
         &self
     ) {
+        let bsk = &self.bootstrapping_key;
         <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
-            engine.enable_fpga();
+            engine.enable_fpga(bsk);
+        })
+    }
+
+    fn disable_fpga(
+        &self
+    ) {
+        <ServerKey as DefaultImplementation>::Engine::with_thread_local_mut(|engine| {
+            engine.disable_fpga();
         })
     }
 }

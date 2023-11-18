@@ -1,7 +1,9 @@
 //! Module containing the definition of the [`CiphertextModulus`].
 
 use crate::core_crypto::commons::traits::UnsignedInteger;
+use crate::core_crypto::prelude::CastInto;
 use core::num::NonZeroU128;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -14,7 +16,15 @@ enum CiphertextModulusInner {
     Custom(NonZeroU128),
 }
 
+#[cfg(bench)]
+impl Default for CiphertextModulusInner {
+    fn default() -> Self {
+        CiphertextModulusInner::Native
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(bench, derive(Default))]
 /// Structure representing a [`CiphertextModulus`] often noted $q$.
 pub struct CiphertextModulus<Scalar: UnsignedInteger> {
     inner: CiphertextModulusInner,
@@ -91,6 +101,7 @@ impl<Scalar: UnsignedInteger> CiphertextModulus<Scalar> {
         }
     }
 
+    #[track_caller]
     pub const fn try_new_power_of_2(exponent: usize) -> Result<Self, &'static str> {
         if exponent > Scalar::BITS {
             Err("Modulus is bigger than the maximum value of the associated Scalar type")
@@ -121,6 +132,7 @@ impl<Scalar: UnsignedInteger> CiphertextModulus<Scalar> {
         }
     }
 
+    #[track_caller]
     pub const fn try_new(modulus: u128) -> Result<Self, &'static str> {
         if Scalar::BITS < 128 && modulus > (1 << Scalar::BITS) {
             Err("Modulus is bigger than the maximum value of the associated Scalar type")
@@ -193,6 +205,7 @@ impl<Scalar: UnsignedInteger> CiphertextModulus<Scalar> {
     }
 
     /// Panics if the modulus is not a custom modulus
+    #[track_caller]
     pub const fn get_custom_modulus(&self) -> u128 {
         match self.inner {
             CiphertextModulusInner::Native => {
@@ -211,6 +224,40 @@ impl<Scalar: UnsignedInteger> CiphertextModulus<Scalar> {
             CiphertextModulusInner::Native => true,
             CiphertextModulusInner::Custom(modulus) => modulus.is_power_of_two(),
         }
+    }
+
+    pub fn try_to<ScalarTo: UnsignedInteger + CastInto<u128>>(
+        &self,
+    ) -> Result<CiphertextModulus<ScalarTo>, &'static str> {
+        let error_msg = "failed to convert ciphertext modulus";
+
+        let new_inner = match self.inner {
+            CiphertextModulusInner::Native => match ScalarTo::BITS.cmp(&Scalar::BITS) {
+                Ordering::Greater => {
+                    CiphertextModulusInner::Custom(NonZeroU128::new(1u128 << Scalar::BITS).unwrap())
+                }
+                Ordering::Equal => CiphertextModulusInner::Native,
+                Ordering::Less => {
+                    return Err(error_msg);
+                }
+            },
+            CiphertextModulusInner::Custom(v) => {
+                let max = NonZeroU128::new(ScalarTo::MAX.cast_into()).unwrap();
+                if v <= max {
+                    CiphertextModulusInner::Custom(v)
+                } else if v.is_power_of_two() && v.ilog2() as usize == ScalarTo::BITS {
+                    CiphertextModulusInner::Native
+                } else {
+                    return Err(error_msg);
+                }
+            }
+        };
+
+        Ok(CiphertextModulus {
+            inner: new_inner,
+            _scalar: Default::default(),
+        }
+        .canonicalize())
     }
 }
 
@@ -326,5 +373,56 @@ mod tests {
                 },
             }
         }
+    }
+
+    #[test]
+    fn test_modulus_casting() {
+        // Native (u64 -> u64) => Native
+        let native_mod = CiphertextModulus::<u64>::try_new_power_of_2(64).unwrap();
+        assert!(native_mod.is_native_modulus());
+        let converted: Result<CiphertextModulus<u64>, _> = native_mod.try_to();
+        assert!(converted.is_ok());
+        assert!(converted.unwrap().is_native_modulus());
+
+        // Native (u64 -> u128) => Custom
+        let native_mod = CiphertextModulus::<u64>::try_new_power_of_2(64).unwrap();
+        let converted: Result<CiphertextModulus<u128>, _> = native_mod.try_to();
+        assert!(converted.is_ok());
+        assert!(!converted.unwrap().is_native_modulus());
+        assert_eq!(converted.unwrap().get_custom_modulus(), 1u128 << 64);
+
+        // Native(u64 -> u32) => Impossible
+        let native_mod = CiphertextModulus::<u64>::try_new_power_of_2(64).unwrap();
+        let converted: Result<CiphertextModulus<u32>, _> = native_mod.try_to();
+        assert!(converted.is_err());
+
+        // Custom(u64 -> u64) => Custom
+        let custom_mod = CiphertextModulus::<u64>::try_new(64).unwrap();
+        assert!(!custom_mod.is_native_modulus());
+        let converted: Result<CiphertextModulus<u64>, _> = custom_mod.try_to();
+        assert!(converted.is_ok());
+        assert!(!converted.unwrap().is_native_modulus());
+        assert_eq!(converted.unwrap().get_custom_modulus(), 64);
+
+        // Custom(u64[with value == 2**32] -> u32) => Native
+        let custom_mod = CiphertextModulus::<u64>::try_new_power_of_2(32).unwrap();
+        assert!(!custom_mod.is_native_modulus());
+        let converted: Result<CiphertextModulus<u32>, _> = custom_mod.try_to();
+        assert!(converted.is_ok());
+        assert!(converted.unwrap().is_native_modulus());
+
+        // Custom (u64[with value > 2**32] -> u32) => Impossible
+        let custom_mod = CiphertextModulus::<u64>::try_new(1 << 48).unwrap();
+        assert!(!custom_mod.is_native_modulus());
+        let converted: Result<CiphertextModulus<u32>, _> = custom_mod.try_to();
+        assert!(converted.is_err());
+
+        // Custom (u64[with value < 2**32] -> u32) => Custom
+        let custom_mod = CiphertextModulus::<u64>::try_new(1 << 21).unwrap();
+        assert!(!custom_mod.is_native_modulus());
+        let converted: Result<CiphertextModulus<u32>, _> = custom_mod.try_to();
+        assert!(converted.is_ok());
+        assert!(!converted.unwrap().is_native_modulus());
+        assert_eq!(converted.unwrap().get_custom_modulus(), 1 << 21);
     }
 }

@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ShortintCompressedBootstrappingKey {
     Classic(SeededLweBootstrapKeyOwned<u64>),
-    MultiBit(SeededLweMultiBitBootstrapKeyOwned<u64>),
+    MultiBit {
+        seeded_bsk: SeededLweMultiBitBootstrapKeyOwned<u64>,
+        deterministic_execution: bool,
+    },
 }
 
 /// A structure containing a compressed server public key.
@@ -38,17 +41,26 @@ impl CompressedServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::client_key::ClientKey;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     /// use tfhe::shortint::server_key::CompressedServerKey;
     ///
     /// // Generate the client key:
-    /// let cks = ClientKey::new(PARAM_MESSAGE_2_CARRY_2);
+    /// let cks = ClientKey::new(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let sks = CompressedServerKey::new(&cks);
     /// ```
     pub fn new(client_key: &ClientKey) -> CompressedServerKey {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine.new_compressed_server_key(client_key).unwrap()
+        })
+    }
+
+    /// Generate a compressed server key with a chosen maximum degree
+    pub fn new_with_max_degree(cks: &ClientKey, max_degree: MaxDegree) -> CompressedServerKey {
+        ShortintEngine::with_thread_local_mut(|engine| {
+            engine
+                .new_compressed_server_key_with_max_degree(cks, max_degree)
+                .unwrap()
         })
     }
 }

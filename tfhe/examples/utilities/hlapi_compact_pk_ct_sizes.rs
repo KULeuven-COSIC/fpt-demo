@@ -7,11 +7,12 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use tfhe::integer::U256;
+use tfhe::keycache::NamedParam;
 use tfhe::prelude::*;
-use tfhe::shortint::keycache::NamedParam;
 use tfhe::shortint::parameters::{
-    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK, PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
+    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS, PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
 };
+use tfhe::shortint::PBSParameters;
 use tfhe::{
     generate_keys, CompactFheUint256List, CompactFheUint32List, CompactPublicKey, ConfigBuilder,
 };
@@ -38,12 +39,14 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
     let operator = OperatorType::Atomic;
 
     {
-        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK;
+        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS;
         let config = ConfigBuilder::all_disabled()
             .enable_custom_integers(params, None)
             .build();
         let (client_key, _) = generate_keys(config);
         let test_name = format!("hlapi_sizes_{}_cpk", params.name());
+
+        let params: PBSParameters = params.into();
 
         println!("Sizes for: {} and 32 bits", params.name());
 
@@ -53,7 +56,7 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
 
         println!("PK size: {cpk_size} bytes");
         write_result(&mut file, &test_name, cpk_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),
@@ -73,7 +76,7 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
         println!("Compact CT list for {NB_CTXT} CTs: {} bytes", cctl_size);
 
         write_result(&mut file, &test_name, cctl_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),
@@ -95,21 +98,24 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
     }
 
     {
-        let params = PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK;
+        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS;
         let config = ConfigBuilder::all_disabled()
             .enable_custom_integers(params, None)
             .build();
         let (client_key, _) = generate_keys(config);
         let test_name = format!("hlapi_sizes_{}_cpk", params.name());
 
+        let params: PBSParameters = params.into();
+
         println!("Sizes for: {} and 32 bits", params.name());
+
         let public_key = CompactPublicKey::new(&client_key);
 
         let cpk_size = bincode::serialize(&public_key).unwrap().len();
 
         println!("PK size: {cpk_size} bytes");
         write_result(&mut file, &test_name, cpk_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),
@@ -129,7 +135,7 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
         println!("Compact CT list for {NB_CTXT} CTs: {} bytes", cctl_size);
 
         write_result(&mut file, &test_name, cctl_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),
@@ -152,11 +158,13 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
 
     // 256 bits
     {
-        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK;
+        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS;
         let config = ConfigBuilder::all_disabled()
             .enable_custom_integers(params, None)
             .build();
         let (client_key, _) = generate_keys(config);
+
+        let params: PBSParameters = params.into();
 
         println!("Sizes for: {} and 256 bits", params.name());
 
@@ -177,7 +185,7 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
         println!("Compact CT list for {NB_CTXT} CTs: {} bytes", cctl_size);
 
         write_result(&mut file, &test_name, cctl_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),
@@ -199,11 +207,13 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
     }
 
     {
-        let params = PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK;
+        let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS;
         let config = ConfigBuilder::all_disabled()
             .enable_custom_integers(params, None)
             .build();
         let (client_key, _) = generate_keys(config);
+
+        let params: PBSParameters = params.into();
 
         println!("Sizes for: {} and 256 bits", params.name());
 
@@ -224,7 +234,7 @@ pub fn cpk_and_cctl_sizes(results_file: &Path) {
         println!("Compact CT list for {NB_CTXT} CTs: {} bytes", cctl_size);
 
         write_result(&mut file, &test_name, cctl_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
             params,
             params.name(),

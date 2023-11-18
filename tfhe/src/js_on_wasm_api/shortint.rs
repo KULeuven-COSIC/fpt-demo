@@ -1,6 +1,8 @@
 use crate::core_crypto::commons::generators::DeterministicSeeder;
 pub use crate::core_crypto::commons::math::random::Seed;
 use crate::core_crypto::prelude::ActivatedRandomGenerator;
+pub use crate::shortint::parameters::parameters_compact_pk::*;
+pub use crate::shortint::parameters::*;
 use bincode;
 use wasm_bindgen::prelude::*;
 
@@ -71,7 +73,7 @@ macro_rules! expose_predefined_parameters {
                 match name {
                     $(
                         ShortintParametersName::$param_name => {
-                            Self(crate::shortint::parameters::$param_name)
+                            Self($param_name)
                         }
                     )*
                 }
@@ -81,6 +83,105 @@ macro_rules! expose_predefined_parameters {
 }
 
 expose_predefined_parameters! {
+    PARAM_MESSAGE_1_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_4_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_5_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_4_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_6_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_5_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_4_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_7_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_7_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_6_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_5_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_4_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_7_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_8_CARRY_0_KS_PBS,
+    // Small params
+    PARAM_MESSAGE_1_CARRY_1_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_2_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_3_PBS_KS,
+    PARAM_MESSAGE_4_CARRY_4_PBS_KS,
+    // CPK
+    PARAM_MESSAGE_1_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_3_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_4_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_5_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_6_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_7_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_1_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_3_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_4_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_5_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_6_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_1_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_3_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_4_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_5_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_1_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_3_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_4_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_1_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_3_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_1_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_2_COMPACT_PK_KS_PBS,
+    PARAM_MESSAGE_7_CARRY_1_COMPACT_PK_KS_PBS,
+    // CPK SMALL
+    PARAM_MESSAGE_1_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_3_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_4_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_5_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_6_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_1_CARRY_7_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_3_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_4_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_5_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_2_CARRY_6_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_3_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_4_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_3_CARRY_5_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_4_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_4_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_4_CARRY_3_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_4_CARRY_4_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_5_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_5_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_5_CARRY_3_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_6_CARRY_1_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_6_CARRY_2_COMPACT_PK_PBS_KS,
+    PARAM_MESSAGE_7_CARRY_1_COMPACT_PK_PBS_KS,
+    // Aliases to remove eventually
     PARAM_MESSAGE_1_CARRY_0,
     PARAM_MESSAGE_1_CARRY_1,
     PARAM_MESSAGE_2_CARRY_0,
@@ -117,14 +218,11 @@ expose_predefined_parameters! {
     PARAM_MESSAGE_6_CARRY_2,
     PARAM_MESSAGE_7_CARRY_1,
     PARAM_MESSAGE_8_CARRY_0,
-
+    // Small params
     PARAM_SMALL_MESSAGE_1_CARRY_1,
     PARAM_SMALL_MESSAGE_2_CARRY_2,
     PARAM_SMALL_MESSAGE_3_CARRY_3,
     PARAM_SMALL_MESSAGE_4_CARRY_4,
-
-    PARAM_MESSAGE_2_CARRY_2_COMPACT_PK,
-    PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
 }
 
 #[wasm_bindgen]
@@ -136,42 +234,42 @@ impl Shortint {
     ) -> Result<ShortintParameters, JsError> {
         set_hook(Box::new(console_error_panic_hook::hook));
         match (message_bits, carry_bits) {
-            (1, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_0),
-            (1, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_1),
-            (2, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_0),
-            (1, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_2),
-            (2, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_1),
-            (3, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_0),
-            (1, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_3),
-            (2, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_2),
-            (3, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_1),
-            (4, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_0),
-            (1, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_4),
-            (2, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_3),
-            (3, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_2),
-            (4, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_1),
-            (5, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_0),
-            (1, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_5),
-            (2, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_4),
-            (3, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_3),
-            (4, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_2),
-            (5, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_1),
-            (6, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_0),
-            (1, 6) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_6),
-            (2, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_5),
-            (3, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_4),
-            (4, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_3),
-            (5, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_2),
-            (6, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_1),
-            (7, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_7_CARRY_0),
-            (1, 7) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_7),
-            (2, 6) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_6),
-            (3, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_5),
-            (4, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_4),
-            (5, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_3),
-            (6, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_2),
-            (7, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_7_CARRY_1),
-            (8, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_8_CARRY_0),
+            (1, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_0_KS_PBS),
+            (1, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_1_KS_PBS),
+            (2, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_0_KS_PBS),
+            (1, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_2_KS_PBS),
+            (2, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_1_KS_PBS),
+            (3, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_0_KS_PBS),
+            (1, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_3_KS_PBS),
+            (2, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS),
+            (3, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_1_KS_PBS),
+            (4, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_0_KS_PBS),
+            (1, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_4_KS_PBS),
+            (2, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_3_KS_PBS),
+            (3, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_2_KS_PBS),
+            (4, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_1_KS_PBS),
+            (5, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_0_KS_PBS),
+            (1, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_5_KS_PBS),
+            (2, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_4_KS_PBS),
+            (3, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_3_KS_PBS),
+            (4, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_2_KS_PBS),
+            (5, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_1_KS_PBS),
+            (6, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_0_KS_PBS),
+            (1, 6) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_6_KS_PBS),
+            (2, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_5_KS_PBS),
+            (3, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_4_KS_PBS),
+            (4, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_3_KS_PBS),
+            (5, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_2_KS_PBS),
+            (6, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_1_KS_PBS),
+            (7, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_7_CARRY_0_KS_PBS),
+            (1, 7) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_7_KS_PBS),
+            (2, 6) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_6_KS_PBS),
+            (3, 5) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_5_KS_PBS),
+            (4, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_4_KS_PBS),
+            (5, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_5_CARRY_3_KS_PBS),
+            (6, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_6_CARRY_2_KS_PBS),
+            (7, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_7_CARRY_1_KS_PBS),
+            (8, 0) => Ok(crate::shortint::parameters::PARAM_MESSAGE_8_CARRY_0_KS_PBS),
             _ => Err(wasm_bindgen::JsError::new(
                 format!(
                 "No parameters for {message_bits} bits of message and {carry_bits} bits of carry"
@@ -189,10 +287,10 @@ impl Shortint {
     ) -> Result<ShortintParameters, JsError> {
         set_hook(Box::new(console_error_panic_hook::hook));
         match (message_bits, carry_bits) {
-            (1, 1) => Ok(crate::shortint::parameters::PARAM_SMALL_MESSAGE_1_CARRY_1),
-            (2, 2) => Ok(crate::shortint::parameters::PARAM_SMALL_MESSAGE_2_CARRY_2),
-            (3, 3) => Ok(crate::shortint::parameters::PARAM_SMALL_MESSAGE_3_CARRY_3),
-            (4, 4) => Ok(crate::shortint::parameters::PARAM_SMALL_MESSAGE_4_CARRY_4),
+            (1, 1) => Ok(crate::shortint::parameters::PARAM_MESSAGE_1_CARRY_1_PBS_KS),
+            (2, 2) => Ok(crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_PBS_KS),
+            (3, 3) => Ok(crate::shortint::parameters::PARAM_MESSAGE_3_CARRY_3_PBS_KS),
+            (4, 4) => Ok(crate::shortint::parameters::PARAM_MESSAGE_4_CARRY_4_PBS_KS),
             _ => Err(wasm_bindgen::JsError::new(
                 format!(
                 "No parameters for {message_bits} bits of message and {carry_bits} bits of carry"

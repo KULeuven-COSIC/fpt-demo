@@ -62,14 +62,21 @@ impl std::error::Error for CheckError {}
 #[derive(Clone, Debug, PartialEq)]
 pub enum ShortintBootstrappingKey {
     Classic(FourierLweBootstrapKeyOwned),
-    MultiBit(FourierLweMultiBitBootstrapKeyOwned, ThreadCount),
+    MultiBit {
+        fourier_bsk: FourierLweMultiBitBootstrapKeyOwned,
+        thread_count: ThreadCount,
+        deterministic_execution: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(bound(deserialize = "C: IntoContainerOwned"))]
 enum SerializableShortintBootstrappingKey<C: Container<Element = concrete_fft::c64>> {
     Classic(FourierLweBootstrapKey<C>),
-    MultiBit(FourierLweMultiBitBootstrapKey<C>),
+    MultiBit {
+        fourier_bsk: FourierLweMultiBitBootstrapKey<C>,
+        deterministic_execution: bool,
+    },
 }
 
 impl Serialize for ShortintBootstrappingKey {
@@ -81,9 +88,14 @@ impl Serialize for ShortintBootstrappingKey {
             ShortintBootstrappingKey::Classic(bsk) => {
                 SerializableShortintBootstrappingKey::Classic(bsk.as_view())
             }
-            ShortintBootstrappingKey::MultiBit(bsk, _) => {
-                SerializableShortintBootstrappingKey::MultiBit(bsk.as_view())
-            }
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: bsk,
+                deterministic_execution,
+                ..
+            } => SerializableShortintBootstrappingKey::MultiBit {
+                fourier_bsk: bsk.as_view(),
+                deterministic_execution: *deterministic_execution,
+            },
         }
         .serialize(serializer)
     }
@@ -100,18 +112,25 @@ impl<'de> Deserialize<'de> for ShortintBootstrappingKey {
             SerializableShortintBootstrappingKey::Classic(bsk) => {
                 Ok(ShortintBootstrappingKey::Classic(bsk))
             }
-            SerializableShortintBootstrappingKey::MultiBit(bsk) => {
+            SerializableShortintBootstrappingKey::MultiBit {
+                fourier_bsk,
+                deterministic_execution,
+            } => {
                 let thread_count = ShortintEngine::with_thread_local_mut(|engine| {
                     engine.get_thread_count_for_multi_bit_pbs(
-                        bsk.input_lwe_dimension(),
-                        bsk.glwe_size().to_glwe_dimension(),
-                        bsk.polynomial_size(),
-                        bsk.decomposition_base_log(),
-                        bsk.decomposition_level_count(),
-                        bsk.grouping_factor(),
+                        fourier_bsk.input_lwe_dimension(),
+                        fourier_bsk.glwe_size().to_glwe_dimension(),
+                        fourier_bsk.polynomial_size(),
+                        fourier_bsk.decomposition_base_log(),
+                        fourier_bsk.decomposition_level_count(),
+                        fourier_bsk.grouping_factor(),
                     )
                 });
-                Ok(ShortintBootstrappingKey::MultiBit(bsk, thread_count))
+                Ok(ShortintBootstrappingKey::MultiBit {
+                    fourier_bsk,
+                    thread_count,
+                    deterministic_execution,
+                })
             }
         }
     }
@@ -121,54 +140,102 @@ impl ShortintBootstrappingKey {
     pub fn input_lwe_dimension(&self) -> LweDimension {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.input_lwe_dimension(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.input_lwe_dimension(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.input_lwe_dimension(),
         }
     }
 
     pub fn polynomial_size(&self) -> PolynomialSize {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.polynomial_size(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.polynomial_size(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.polynomial_size(),
         }
     }
 
     pub fn glwe_size(&self) -> GlweSize {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.glwe_size(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.glwe_size(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.glwe_size(),
         }
     }
 
     pub fn decomposition_base_log(&self) -> DecompositionBaseLog {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.decomposition_base_log(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.decomposition_base_log(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.decomposition_base_log(),
         }
     }
 
     pub fn decomposition_level_count(&self) -> DecompositionLevelCount {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.decomposition_level_count(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.decomposition_level_count(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.decomposition_level_count(),
         }
     }
 
     pub fn output_lwe_dimension(&self) -> LweDimension {
         match self {
             ShortintBootstrappingKey::Classic(inner) => inner.output_lwe_dimension(),
-            ShortintBootstrappingKey::MultiBit(inner, _) => inner.output_lwe_dimension(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: inner, ..
+            } => inner.output_lwe_dimension(),
         }
     }
 
     pub fn bootstrapping_key_size_elements(&self) -> usize {
         match self {
-            ShortintBootstrappingKey::Classic(bsk) => bsk.as_view().data().as_ref().len(),
-            ShortintBootstrappingKey::MultiBit(bsk, _) => bsk.as_view().data().as_ref().len(),
+            ShortintBootstrappingKey::Classic(bsk) => bsk.as_view().data().len(),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: bsk, ..
+            } => bsk.as_view().data().len(),
         }
     }
 
     pub fn bootstrapping_key_size_bytes(&self) -> usize {
-        self.bootstrapping_key_size_elements() * std::mem::size_of::<concrete_fft::c64>()
+        match self {
+            ShortintBootstrappingKey::Classic(bsk) => std::mem::size_of_val(bsk.as_view().data()),
+            ShortintBootstrappingKey::MultiBit {
+                fourier_bsk: bsk, ..
+            } => std::mem::size_of_val(bsk.as_view().data()),
+        }
+    }
+
+    /// Indicate whether the PBS algorithm is deterministic, i.e. will produce the same bit-exact
+    /// output when run twice on the same bit-exact input.
+    ///
+    /// Note: the classic PBS algorithm is always deterministic.
+    pub fn deterministic_pbs_execution(&self) -> bool {
+        match self {
+            ShortintBootstrappingKey::Classic(_) => true,
+            ShortintBootstrappingKey::MultiBit {
+                deterministic_execution,
+                ..
+            } => *deterministic_execution,
+        }
+    }
+
+    /// Set the choice of PBS algorithm to have the `new_deterministic_execution` behavior.
+    ///
+    /// Note: the classic PBS algorithm is always deterministic and calling this function on a
+    /// [`ServerKey`] made from [`super::ClassicPBSParameters`] is a no-op.
+    pub fn set_deterministic_pbs_execution(&mut self, new_deterministic_execution: bool) {
+        match self {
+            // Classic PBS is already deterministic no matter what
+            ShortintBootstrappingKey::Classic(_) => (),
+            ShortintBootstrappingKey::MultiBit {
+                deterministic_execution,
+                ..
+            } => *deterministic_execution = new_deterministic_execution,
+        }
     }
 }
 
@@ -240,11 +307,11 @@ impl ServerKey {
     /// # Example
     ///
     /// ```rust
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     /// use tfhe::shortint::{gen_keys, ServerKey};
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// // Generate the server key:
     /// let sks = ServerKey::new(&cks);
@@ -268,10 +335,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg = 3;
     ///
@@ -317,10 +384,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg_1 = 3;
     /// let msg_2 = 2;
@@ -353,44 +420,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
-    ///
-    /// let mut ct1 = cks.encrypt(3);
-    /// // |      ct1        |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  0 0  |   1 1   |
-    /// let mut ct2 = cks.encrypt(2);
-    /// // |      ct2        |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  0 0  |   1 0   |
-    ///
-    /// let ct_res = sks.smart_add(&mut ct1, &mut ct2);
-    /// // |     ct_res      |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  0 1  |   0 1   |
-    ///
-    /// // Get the carry
-    /// let ct_carry = sks.carry_extract(&ct_res);
-    /// let carry = cks.decrypt(&ct_carry);
-    /// assert_eq!(carry, 1);
-    ///
-    /// let ct_res = sks.clear_carry(&ct_res);
-    ///
-    /// let ct_carry = sks.carry_extract(&ct_res);
-    /// let carry = cks.decrypt(&ct_carry);
-    /// assert_eq!(carry, 0);
-    ///
-    /// let clear = cks.decrypt(&ct_res);
-    ///
-    /// assert_eq!(clear, (3 + 2) % 4);
-    ///
-    /// let (cks, sks) = gen_keys(PARAM_SMALL_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let mut ct1 = cks.encrypt(3);
     /// // |      ct1        |
@@ -440,10 +473,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg: u64 = 3;
     /// let ct1 = cks.encrypt(msg);
@@ -490,10 +523,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg: u64 = 3;
     /// let ct1 = cks.encrypt(msg);
@@ -540,10 +573,10 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg: u64 = 3;
     /// let ct = cks.encrypt(msg);
@@ -644,10 +677,10 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let clear = 9;
     ///
@@ -683,10 +716,10 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let clear = 9;
     ///
@@ -720,34 +753,12 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let clear = 9;
-    ///
-    /// // Encrypt a message
-    /// let mut ct = cks.unchecked_encrypt(clear);
-    ///
-    /// // |       ct        |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  1 0  |   0 1   |
-    ///
-    /// // Compute homomorphically the message extraction
-    /// sks.message_extract_assign(&mut ct);
-    ///
-    /// // |       ct        |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  0 0  |   0 1   |
-    ///
-    /// // Decrypt:
-    /// let res = cks.decrypt(&ct);
-    /// assert_eq!(1, res);
-    ///
-    /// let (cks, sks) = gen_keys(PARAM_SMALL_MESSAGE_2_CARRY_2);
     ///
     /// // Encrypt a message
     /// let mut ct = cks.unchecked_encrypt(clear);
@@ -781,35 +792,12 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::shortint::gen_keys;
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let clear = 9;
-    ///
-    /// // Encrypt a message
-    /// let ct = cks.unchecked_encrypt(clear);
-    ///
-    /// // |       ct        |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  1 0  |   0 1   |
-    ///
-    /// // Compute homomorphically the message extraction
-    /// let ct_res = sks.message_extract(&ct);
-    ///
-    /// // |     ct_res      |
-    /// // | carry | message |
-    /// // |-------|---------|
-    /// // |  0 0  |   0 1   |
-    ///
-    /// // Decrypt:
-    /// let res = cks.decrypt(&ct_res);
-    /// assert_eq!(1, res);
-    ///
-    /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_SMALL_MESSAGE_2_CARRY_2);
     ///
     /// // Encrypt a message
     /// let ct = cks.unchecked_encrypt(clear);
@@ -841,11 +829,11 @@ impl ServerKey {
     /// # Example
     ///
     /// ```rust
-    /// use tfhe::shortint::parameters::{PARAM_MESSAGE_2_CARRY_2, PARAM_SMALL_MESSAGE_2_CARRY_2};
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     /// use tfhe::shortint::{gen_keys, Ciphertext};
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
     ///
     /// let msg = 1;
     ///
@@ -884,6 +872,15 @@ impl ServerKey {
     pub fn key_switching_key_size_bytes(&self) -> usize {
         std::mem::size_of_val(self.key_switching_key.as_ref())
     }
+
+    pub fn deterministic_pbs_execution(&self) -> bool {
+        self.bootstrapping_key.deterministic_pbs_execution()
+    }
+
+    pub fn set_deterministic_pbs_execution(&mut self, new_deterministic_execution: bool) {
+        self.bootstrapping_key
+            .set_deterministic_pbs_execution(new_deterministic_execution)
+    }
 }
 
 impl From<CompressedServerKey> for ServerKey {
@@ -919,7 +916,10 @@ impl From<CompressedServerKey> for ServerKey {
 
                 ShortintBootstrappingKey::Classic(bootstrapping_key)
             }
-            ShortintCompressedBootstrappingKey::MultiBit(bootstrapping_key) => {
+            ShortintCompressedBootstrappingKey::MultiBit {
+                seeded_bsk: bootstrapping_key,
+                deterministic_execution,
+            } => {
                 let standard_bootstrapping_key =
                     bootstrapping_key.decompress_into_lwe_multi_bit_bootstrap_key();
 
@@ -948,7 +948,11 @@ impl From<CompressedServerKey> for ServerKey {
                     )
                 });
 
-                ShortintBootstrappingKey::MultiBit(bootstrapping_key, thread_count)
+                ShortintBootstrappingKey::MultiBit {
+                    fourier_bsk: bootstrapping_key,
+                    thread_count,
+                    deterministic_execution,
+                }
             }
         };
 

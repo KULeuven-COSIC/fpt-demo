@@ -213,12 +213,7 @@ fn test_uint32() {
     assert_eq!(decrypted, !clear_c);
 }
 
-#[test]
-fn test_uint32_shift() {
-    let config = ConfigBuilder::all_disabled()
-        .enable_default_integers()
-        .build();
-
+fn fhe_uint32_shift(config: Config) {
     let (cks, sks) = generate_keys(config);
 
     use rand::prelude::*;
@@ -276,11 +271,105 @@ fn test_uint32_shift() {
 }
 
 #[test]
-fn test_uint32_rotate() {
+fn test_uint32_bitwise() {
     let config = ConfigBuilder::all_disabled()
         .enable_default_integers()
         .build();
 
+    let (cks, sks) = generate_keys(config);
+
+    use rand::prelude::*;
+
+    let mut rng = rand::thread_rng();
+    let clear_a = rng.gen::<u32>();
+    let clear_b = rng.gen_range(0u32..32u32);
+
+    let a = FheUint32::try_encrypt(clear_a, &cks).unwrap();
+    let b = FheUint32::try_encrypt(clear_b, &cks).unwrap();
+
+    set_server_key(sks);
+
+    // encrypted bitwise
+    {
+        let c = &a | &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a | clear_b);
+
+        let c = &a & &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a & clear_b);
+
+        let c = &a ^ &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a ^ clear_b);
+
+        let mut c = a.clone();
+        c |= &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a | clear_b);
+
+        let mut c = a.clone();
+        c &= &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a & clear_b);
+
+        let mut c = a.clone();
+        c ^= &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a ^ clear_b);
+    }
+
+    // clear bitwise
+    {
+        let c = &a | b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a | clear_b);
+
+        let c = &a & clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a & clear_b);
+
+        let c = &a ^ clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a ^ clear_b);
+
+        let mut c = a.clone();
+        c |= clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a | clear_b);
+
+        let mut c = a.clone();
+        c &= clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a & clear_b);
+
+        let mut c = a;
+        c ^= clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a ^ clear_b);
+    }
+}
+
+#[test]
+fn test_bit_shift() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_integers()
+        .build();
+    fhe_uint32_shift(config);
+}
+
+#[test]
+fn test_multi_bit_shift() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_custom_integers(
+            crate::shortint::parameters::PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS,
+            None,
+        )
+        .build();
+    fhe_uint32_shift(config);
+}
+
+fn fhe_uint32_rotate(config: Config) {
     let (cks, sks) = generate_keys(config);
 
     use rand::prelude::*;
@@ -335,6 +424,113 @@ fn test_uint32_rotate() {
         let decrypted: u32 = c.decrypt(&cks);
         assert_eq!(decrypted, clear_a.rotate_left(clear_b));
     }
+}
+
+#[test]
+fn test_uint32_rotate() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_integers()
+        .build();
+    fhe_uint32_rotate(config);
+}
+
+#[test]
+fn test_multi_bit_rotate() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_custom_integers(
+            crate::shortint::parameters::PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS,
+            None,
+        )
+        .build();
+    fhe_uint32_rotate(config);
+}
+
+fn fhe_uint32_div_rem(config: Config) {
+    let (cks, sks) = generate_keys(config);
+
+    use rand::prelude::*;
+
+    let mut rng = rand::thread_rng();
+    let clear_a = rng.gen::<u32>();
+    let clear_b = rng.gen_range(1u32..=u32::MAX);
+
+    let a = FheUint32::try_encrypt(clear_a, &cks).unwrap();
+    let b = FheUint32::try_encrypt(clear_b, &cks).unwrap();
+
+    set_server_key(sks);
+
+    // encrypted div/rem
+    {
+        let c = &a / &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a / clear_b);
+
+        let c = &a % &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a % clear_b);
+
+        let (q, r) = (&a).div_rem(&b);
+        let decrypted_q: u32 = q.decrypt(&cks);
+        let decrypted_r: u32 = r.decrypt(&cks);
+        assert_eq!(decrypted_q, clear_a / clear_b);
+        assert_eq!(decrypted_r, clear_a % clear_b);
+
+        let mut c = a.clone();
+        c /= &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a / clear_b);
+
+        let mut c = a.clone();
+        c %= &b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a % clear_b);
+    }
+
+    // clear div/rem
+    {
+        let c = &a / clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a / clear_b);
+
+        let c = &a % clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a % clear_b);
+
+        let (q, r) = (&a).div_rem(clear_b);
+        let decrypted_q: u32 = q.decrypt(&cks);
+        let decrypted_r: u32 = r.decrypt(&cks);
+        assert_eq!(decrypted_q, clear_a / clear_b);
+        assert_eq!(decrypted_r, clear_a % clear_b);
+
+        let mut c = a.clone();
+        c /= clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a / clear_b);
+
+        let mut c = a;
+        c %= clear_b;
+        let decrypted: u32 = c.decrypt(&cks);
+        assert_eq!(decrypted, clear_a % clear_b);
+    }
+}
+
+#[test]
+fn test_uint32_div_rem() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_integers()
+        .build();
+    fhe_uint32_div_rem(config);
+}
+
+#[test]
+fn test_multi_div_rem() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_custom_integers(
+            crate::shortint::parameters::PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS,
+            None,
+        )
+        .build();
+    fhe_uint32_div_rem(config);
 }
 
 #[test]
@@ -420,7 +616,7 @@ fn test_decompressed_public_key_encrypt() {
 fn test_compact_public_key_big() {
     let config = ConfigBuilder::all_disabled()
         .enable_custom_integers(
-            crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK,
+            crate::shortint::parameters::parameters_compact_pk::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS,
             None,
         )
         .build();
@@ -437,7 +633,7 @@ fn test_compact_public_key_big() {
 fn test_compact_public_key_list_big() {
     let config = ConfigBuilder::all_disabled()
         .enable_custom_integers(
-            crate::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK,
+            crate::shortint::parameters::parameters_compact_pk::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS,
             None,
         )
         .build();
@@ -448,7 +644,8 @@ fn test_compact_public_key_list_big() {
 fn test_compact_public_key_list_small() {
     let config = ConfigBuilder::all_disabled()
         .enable_custom_integers(
-            crate::shortint::parameters::PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
+            crate::shortint::parameters::parameters_compact_pk
+                ::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
             None,
         )
         .build();
@@ -495,7 +692,8 @@ fn test_compact_public_key_list(config: Config) {
 fn test_compact_public_key_small() {
     let config = ConfigBuilder::all_disabled()
         .enable_custom_integers(
-            crate::shortint::parameters::PARAM_SMALL_MESSAGE_2_CARRY_2_COMPACT_PK,
+            crate::shortint::parameters::parameters_compact_pk
+                ::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_PBS_KS,
             None,
         )
         .build();
@@ -587,4 +785,35 @@ fn test_integer_casting() {
         let da: u16 = a.decrypt(&client_key);
         assert_eq!(da, clear);
     }
+}
+
+#[test]
+fn test_if_then_else() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_integers()
+        .build();
+
+    let (client_key, server_key) = generate_keys(config);
+
+    set_server_key(server_key);
+
+    let clear_a = 27u8;
+    let clear_b = 128u8;
+
+    let a = FheUint8::encrypt(clear_a, &client_key);
+    let b = FheUint8::encrypt(clear_b, &client_key);
+
+    let result = a.le(&b).if_then_else(&a, &b);
+    let decrypted_result: u8 = result.decrypt(&client_key);
+    assert_eq!(
+        decrypted_result,
+        if clear_a <= clear_b { clear_a } else { clear_b }
+    );
+
+    let result = a.le(&b).if_then_else(&b, &a);
+    let decrypted_result: u8 = result.decrypt(&client_key);
+    assert_eq!(
+        decrypted_result,
+        if clear_a <= clear_b { clear_b } else { clear_a }
+    );
 }

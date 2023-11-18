@@ -4,7 +4,9 @@
 //! underlying `core_crypto` module.
 
 use crate::boolean::ciphertext::{Ciphertext, CompressedCiphertext};
-use crate::boolean::parameters::{BooleanKeySwitchingParameters, BooleanParameters};
+use crate::boolean::parameters::{
+    BooleanKeySwitchingParameters, BooleanParameters, EncryptionKeyChoice,
+};
 use crate::boolean::{ClientKey, CompressedPublicKey, PublicKey, PLAINTEXT_FALSE, PLAINTEXT_TRUE};
 use crate::core_crypto::algorithms::*;
 use crate::core_crypto::entities::*;
@@ -15,7 +17,7 @@ use crate::core_crypto::commons::generators::{
     DeterministicSeeder, EncryptionRandomGenerator, SecretRandomGenerator,
 };
 use crate::core_crypto::commons::math::random::{ActivatedRandomGenerator, Seeder};
-use crate::core_crypto::commons::parameters::*;
+use crate::core_crypto::commons::parameters::{PBSOrder, *};
 use crate::core_crypto::seeders::new_seeder;
 
 #[cfg(test)]
@@ -68,8 +70,10 @@ pub(crate) trait PackedBinaryGatesEngine<L, R, K> {
     ) -> Vec<Ciphertext>;
 }
 
+#[cfg(feature = "fpga")]
 pub(crate) trait FpgaEngine<K> {
-    fn enable_fpga(&mut self);
+    fn enable_fpga(&mut self, bsk: &FourierLweBootstrapKeyOwned);
+    fn disable_fpga(&mut self);
 }
 
 pub(crate) trait BinaryGatesAssignEngine<L, R, K> {
@@ -157,25 +161,36 @@ impl BooleanEngine {
     pub fn create_public_key(&mut self, client_key: &ClientKey) -> PublicKey {
         let client_parameters = client_key.parameters;
 
+        let (lwe_sk, encryption_noise) = match client_parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => (
+                client_key.glwe_secret_key.as_lwe_secret_key(),
+                client_key.parameters.glwe_modular_std_dev,
+            ),
+            EncryptionKeyChoice::Small => {
+                let view = LweSecretKey::from_container(client_key.lwe_secret_key.as_ref());
+                (view, client_key.parameters.lwe_modular_std_dev)
+            }
+        };
+
         // Formula is (n + 1) * log2(q) + 128
         let zero_encryption_count = LwePublicKeyZeroEncryptionCount(
-            client_parameters.lwe_dimension.to_lwe_size().0 * LOG2_Q_32 + 128,
+            lwe_sk.lwe_dimension().to_lwe_size().0 * LOG2_Q_32 + 128,
         );
 
         #[cfg(not(feature = "__wasm_api"))]
         let lwe_public_key: LwePublicKeyOwned<u32> = par_allocate_and_generate_new_lwe_public_key(
-            &client_key.lwe_secret_key,
+            &lwe_sk,
             zero_encryption_count,
-            client_key.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.encryption_generator,
         );
 
         #[cfg(feature = "__wasm_api")]
         let lwe_public_key: LwePublicKeyOwned<u32> = allocate_and_generate_new_lwe_public_key(
-            &client_key.lwe_secret_key,
+            &lwe_sk,
             zero_encryption_count,
-            client_key.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.encryption_generator,
         );
@@ -189,25 +204,36 @@ impl BooleanEngine {
     pub fn create_compressed_public_key(&mut self, client_key: &ClientKey) -> CompressedPublicKey {
         let client_parameters = client_key.parameters;
 
+        let (lwe_sk, encryption_noise) = match client_parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => (
+                client_key.glwe_secret_key.as_lwe_secret_key(),
+                client_key.parameters.glwe_modular_std_dev,
+            ),
+            EncryptionKeyChoice::Small => {
+                let view = LweSecretKey::from_container(client_key.lwe_secret_key.as_ref());
+                (view, client_key.parameters.lwe_modular_std_dev)
+            }
+        };
+
         // Formula is (n + 1) * log2(q) + 128
         let zero_encryption_count = LwePublicKeyZeroEncryptionCount(
-            client_parameters.lwe_dimension.to_lwe_size().0 * LOG2_Q_32 + 128,
+            lwe_sk.lwe_dimension().to_lwe_size().0 * LOG2_Q_32 + 128,
         );
 
         #[cfg(not(feature = "__wasm_api"))]
         let compressed_lwe_public_key = par_allocate_and_generate_new_seeded_lwe_public_key(
-            &client_key.lwe_secret_key,
+            &lwe_sk,
             zero_encryption_count,
-            client_key.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.bootstrapper.seeder,
         );
 
         #[cfg(feature = "__wasm_api")]
         let compressed_lwe_public_key = allocate_and_generate_new_seeded_lwe_public_key(
-            &client_key.lwe_secret_key,
+            &lwe_sk,
             zero_encryption_count,
-            client_key.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.bootstrapper.seeder,
         );
@@ -224,10 +250,31 @@ impl BooleanEngine {
         cks2: &ClientKey,
         params: BooleanKeySwitchingParameters,
     ) -> LweKeyswitchKeyOwned<u32> {
+        let (lwe_sk1, lwe_sk2) = match (
+            cks1.parameters.encryption_key_choice,
+            cks2.parameters.encryption_key_choice,
+        ) {
+            (EncryptionKeyChoice::Big, EncryptionKeyChoice::Big) => (
+                cks1.glwe_secret_key.as_lwe_secret_key(),
+                cks2.glwe_secret_key.as_lwe_secret_key(),
+            ),
+            (EncryptionKeyChoice::Small, EncryptionKeyChoice::Small) => {
+                let view1 = LweSecretKey::from_container(cks1.lwe_secret_key.as_ref());
+                let view2 = LweSecretKey::from_container(cks2.lwe_secret_key.as_ref());
+                (view1, view2)
+            }
+            (choice1, choice2) => panic!(
+                "EncryptionKeyChoice of cks1 and cks2 must be the same.\
+cks1 has {:?}, cks2 has: {:?}
+            ",
+                choice1, choice2
+            ),
+        };
+
         // Creation of the key switching key
         allocate_and_generate_new_lwe_keyswitch_key(
-            &cks1.lwe_secret_key,
-            &cks2.lwe_secret_key,
+            &lwe_sk1,
+            &lwe_sk2,
             params.ks_base_log,
             params.ks_level,
             cks2.parameters.lwe_modular_std_dev,
@@ -248,11 +295,22 @@ impl BooleanEngine {
             Plaintext(PLAINTEXT_FALSE)
         };
 
+        let (lwe_sk, encryption_noise) = match cks.parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => (
+                cks.glwe_secret_key.as_lwe_secret_key(),
+                cks.parameters.glwe_modular_std_dev,
+            ),
+            EncryptionKeyChoice::Small => {
+                let view = LweSecretKey::from_container(cks.lwe_secret_key.as_ref());
+                (view, cks.parameters.lwe_modular_std_dev)
+            }
+        };
+
         // encryption
         let ct = allocate_and_encrypt_new_lwe_ciphertext(
-            &cks.lwe_secret_key,
+            &lwe_sk,
             plain,
-            cks.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.encryption_generator,
         );
@@ -268,11 +326,22 @@ impl BooleanEngine {
             Plaintext(PLAINTEXT_FALSE)
         };
 
+        let (lwe_sk, encryption_noise) = match cks.parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => (
+                cks.glwe_secret_key.as_lwe_secret_key(),
+                cks.parameters.glwe_modular_std_dev,
+            ),
+            EncryptionKeyChoice::Small => {
+                let view = LweSecretKey::from_container(cks.lwe_secret_key.as_ref());
+                (view, cks.parameters.lwe_modular_std_dev)
+            }
+        };
+
         // encryption
         let ct = allocate_and_encrypt_new_seeded_lwe_ciphertext(
-            &cks.lwe_secret_key,
+            &lwe_sk,
             plain,
-            cks.parameters.lwe_modular_std_dev,
+            encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.bootstrapper.seeder,
         );
@@ -290,7 +359,7 @@ impl BooleanEngine {
 
         let mut output = LweCiphertext::new(
             0u32,
-            pks.parameters.lwe_dimension.to_lwe_size(),
+            pks.lwe_public_key.lwe_size(),
             CiphertextModulus::new_native(),
         );
 
@@ -303,7 +372,7 @@ impl BooleanEngine {
         );
 
         Ciphertext::Encrypted(output)
-    }    
+    }
     pub fn encrypt_with_compressed_public_key(
         &mut self,
         message: bool,
@@ -317,7 +386,7 @@ impl BooleanEngine {
 
         let mut output = LweCiphertext::new(
             0u32,
-            compressed_pk.parameters.lwe_dimension.to_lwe_size(),
+            compressed_pk.compressed_lwe_public_key.lwe_size(),
             CiphertextModulus::new_native(),
         );
 
@@ -335,8 +404,15 @@ impl BooleanEngine {
         match ct {
             Ciphertext::Trivial(b) => *b,
             Ciphertext::Encrypted(ciphertext) => {
+                let lwe_sk = match cks.parameters.encryption_key_choice {
+                    EncryptionKeyChoice::Big => cks.glwe_secret_key.as_lwe_secret_key(),
+                    EncryptionKeyChoice::Small => {
+                        LweSecretKey::from_container(cks.lwe_secret_key.as_ref())
+                    }
+                };
+
                 // decryption
-                let decrypted = decrypt_lwe_ciphertext(&cks.lwe_secret_key, ciphertext);
+                let decrypted = decrypt_lwe_ciphertext(&lwe_sk, ciphertext);
 
                 // cast as a u32
                 let decrypted_u32 = decrypted.0;
@@ -450,11 +526,20 @@ impl BooleanEngine {
                 } else {
                     Plaintext(PLAINTEXT_FALSE)
                 };
-                allocate_and_trivially_encrypt_new_lwe_ciphertext(
-                    server_key
+
+                let lwe_size = match server_key.pbs_order {
+                    PBSOrder::KeyswitchBootstrap => server_key
+                        .key_switching_key
+                        .input_key_lwe_dimension()
+                        .to_lwe_size(),
+                    PBSOrder::BootstrapKeyswitch => server_key
                         .bootstrapping_key
                         .input_lwe_dimension()
                         .to_lwe_size(),
+                };
+
+                allocate_and_trivially_encrypt_new_lwe_ciphertext(
+                    lwe_size,
                     plain,
                     CiphertextModulus::new_native(),
                 )
@@ -509,11 +594,8 @@ impl BooleanEngine {
 
                 let mut buffer_lwe_before_pbs_o = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
-                        ct_condition_ct.ciphertext_modulus(),
+                    ct_condition_ct.lwe_size(),
+                    ct_condition_ct.ciphertext_modulus(),
                 );
 
                 let buffer_lwe_before_pbs = &mut buffer_lwe_before_pbs_o;
@@ -533,23 +615,47 @@ impl BooleanEngine {
                 let cst = Plaintext(PLAINTEXT_FALSE);
                 lwe_ciphertext_plaintext_add_assign(&mut ct_temp_2, cst); // - 1/8
 
-                // Compute the first programmable bootstrapping with fixed test polynomial:
-                let mut ct_pbs_1 = bootstrapper
-                    .bootstrap(buffer_lwe_before_pbs, server_key)
-                    .unwrap();
+                match server_key.pbs_order {
+                    PBSOrder::KeyswitchBootstrap => {
+                        let ct_ks_1 = bootstrapper
+                            .keyswitch(buffer_lwe_before_pbs, server_key)
+                            .unwrap();
 
-                let ct_pbs_2 = bootstrapper.bootstrap(&ct_temp_2, server_key).unwrap();
+                        // Compute the first programmable bootstrapping with fixed test polynomial:
+                        let mut ct_pbs_1 = bootstrapper.bootstrap(&ct_ks_1, server_key).unwrap();
 
-                // Compute the linear combination to add the two results:
-                // buffer_lwe_pbs + ct_pbs_2 + (0,...,0, +1/8)
-                lwe_ciphertext_add_assign(&mut ct_pbs_1, &ct_pbs_2); // + buffer_lwe_pbs
-                let cst = Plaintext(PLAINTEXT_TRUE);
-                lwe_ciphertext_plaintext_add_assign(&mut ct_pbs_1, cst); // + 1/8
+                        let ct_ks_2 = bootstrapper.keyswitch(&ct_temp_2, server_key).unwrap();
+                        let ct_pbs_2 = bootstrapper.bootstrap(&ct_ks_2, server_key).unwrap();
 
-                let ct_ks = bootstrapper.keyswitch(&ct_pbs_1, server_key).unwrap();
+                        // Compute the linear combination to add the two results:
+                        // buffer_lwe_pbs + ct_pbs_2 + (0,...,0, +1/8)
+                        lwe_ciphertext_add_assign(&mut ct_pbs_1, &ct_pbs_2); // + buffer_lwe_pbs
+                        let cst = Plaintext(PLAINTEXT_TRUE);
+                        lwe_ciphertext_plaintext_add_assign(&mut ct_pbs_1, cst); // + 1/8
 
-                // Output the result:
-                Ciphertext::Encrypted(ct_ks)
+                        // Output the result:
+                        Ciphertext::Encrypted(ct_pbs_1)
+                    }
+                    PBSOrder::BootstrapKeyswitch => {
+                        // Compute the first programmable bootstrapping with fixed test polynomial:
+                        let mut ct_pbs_1 = bootstrapper
+                            .bootstrap(buffer_lwe_before_pbs, server_key)
+                            .unwrap();
+
+                        let ct_pbs_2 = bootstrapper.bootstrap(&ct_temp_2, server_key).unwrap();
+
+                        // Compute the linear combination to add the two results:
+                        // buffer_lwe_pbs + ct_pbs_2 + (0,...,0, +1/8)
+                        lwe_ciphertext_add_assign(&mut ct_pbs_1, &ct_pbs_2); // + buffer_lwe_pbs
+                        let cst = Plaintext(PLAINTEXT_TRUE);
+                        lwe_ciphertext_plaintext_add_assign(&mut ct_pbs_1, cst); // + 1/8
+
+                        let ct_ks = bootstrapper.keyswitch(&ct_pbs_1, server_key).unwrap();
+
+                        // Output the result:
+                        Ciphertext::Encrypted(ct_ks)
+                    }
+                }
             }
         }
     }
@@ -558,7 +664,7 @@ impl BooleanEngine {
 use itertools::izip;
 
 impl PackedBinaryGatesEngine<Ciphertext, Ciphertext, ServerKey> for BooleanEngine {
-    
+
     fn gates_packed(
         &mut self,
         gates: &Vec<Gate>,
@@ -673,13 +779,14 @@ impl PackedBinaryGatesEngine<Ciphertext, Ciphertext, ServerKey> for BooleanEngin
     }
 }
 
+#[cfg(feature = "fpga")]
 impl FpgaEngine<ServerKey> for BooleanEngine {
-    
-    fn enable_fpga(
-        &mut self
-    ) {
-        self
-            .bootstrapper.enable_fpga();
+    fn enable_fpga(&mut self, bsk: &FourierLweBootstrapKeyOwned) {
+        self.bootstrapper.enable_fpga(bsk);
+    }
+
+    fn disable_fpga(&mut self) {
+        self.bootstrapper.disable_fpga();
     }
 }
 
@@ -703,10 +810,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
 
@@ -721,7 +825,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }
@@ -746,10 +850,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
                 let bootstrapper = &mut self.bootstrapper;
@@ -764,7 +865,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }
@@ -789,10 +890,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
                 let bootstrapper = &mut self.bootstrapper;
@@ -808,7 +906,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }
@@ -833,10 +931,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
                 let bootstrapper = &mut self.bootstrapper;
@@ -850,7 +945,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }
@@ -875,10 +970,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
                 let bootstrapper = &mut self.bootstrapper;
@@ -895,7 +987,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }
@@ -920,10 +1012,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
             (Ciphertext::Encrypted(ct_left_ct), Ciphertext::Encrypted(ct_right_ct)) => {
                 let mut buffer_lwe_before_pbs = LweCiphertext::new(
                     0u32,
-                    server_key
-                        .bootstrapping_key
-                        .input_lwe_dimension()
-                        .to_lwe_size(),
+                    ct_left_ct.lwe_size(),
                     ct_left_ct.ciphertext_modulus(),
                 );
                 let bootstrapper = &mut self.bootstrapper;
@@ -942,7 +1031,7 @@ impl BinaryGatesEngine<&Ciphertext, &Ciphertext, ServerKey> for BooleanEngine {
 
                 // compute the bootstrap and the key switch
                 bootstrapper
-                    .bootstrap_keyswitch(buffer_lwe_before_pbs, server_key)
+                    .apply_bootstrapping_pattern(buffer_lwe_before_pbs, server_key)
                     .unwrap()
             }
         }

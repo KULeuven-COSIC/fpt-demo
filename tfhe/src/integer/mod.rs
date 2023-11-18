@@ -15,7 +15,7 @@
 //!
 //! ```rust
 //! use tfhe::integer::gen_keys_radix;
-//! use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+//! use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
 //!
 //! //4 blocks for the radix decomposition
 //! let number_of_blocks = 4;
@@ -24,7 +24,7 @@
 //!
 //! // Generation of the client/server keys, using the default parameters:
 //! let (mut client_key, mut server_key) =
-//!     gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, number_of_blocks);
+//!     gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, number_of_blocks);
 //!
 //! let msg1 = 153;
 //! let msg2 = 125;
@@ -53,6 +53,7 @@ mod tests;
 pub mod block_decomposition;
 pub(crate) mod encryption;
 
+pub mod bigint;
 pub mod ciphertext;
 pub mod client_key;
 pub mod key_switching_key;
@@ -61,14 +62,14 @@ pub mod keycache;
 pub mod parameters;
 pub mod public_key;
 pub mod server_key;
-pub mod u256;
 pub mod wopbs;
 
+pub use bigint::u256::U256;
+pub use bigint::u512::U512;
 pub use ciphertext::{CrtCiphertext, IntegerCiphertext, RadixCiphertext};
 pub use client_key::{ClientKey, CrtClientKey, RadixClientKey};
 pub use public_key::{CompressedCompactPublicKey, CompressedPublicKey, PublicKey};
 pub use server_key::{CheckError, CompressedServerKey, ServerKey};
-pub use u256::U256;
 
 /// Generate a couple of client and server keys with given parameters
 ///
@@ -78,10 +79,10 @@ pub use u256::U256;
 ///
 /// ```rust
 /// use tfhe::integer::gen_keys;
-/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
 ///
 /// // generate the client key and the server key:
-/// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+/// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2_KS_PBS);
 /// ```
 pub fn gen_keys<P>(parameters_set: P) -> (ClientKey, ServerKey)
 where
@@ -151,11 +152,11 @@ where
 ///
 /// ```rust
 /// use tfhe::integer::gen_keys_radix;
-/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
 ///
 /// // generate the client key and the server key:
 /// let num_blocks = 4;
-/// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+/// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
 /// ```
 pub fn gen_keys_radix<P>(parameters_set: P, num_blocks: usize) -> (RadixClientKey, ServerKey)
 where
@@ -173,11 +174,11 @@ where
 ///
 /// ```rust
 /// use tfhe::integer::gen_keys_crt;
-/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
 ///
 /// // generate the client key and the server key:
 /// let basis = vec![2, 3, 5];
-/// let (cks, sks) = gen_keys_crt(PARAM_MESSAGE_2_CARRY_2, basis);
+/// let (cks, sks) = gen_keys_crt(PARAM_MESSAGE_2_CARRY_2_KS_PBS, basis);
 /// ```
 pub fn gen_keys_crt(
     parameters_set: crate::shortint::parameters::ClassicPBSParameters,

@@ -5,10 +5,12 @@ use std::path::PathBuf;
 use tfhe::boolean::parameters::BooleanParameters;
 use tfhe::core_crypto::prelude::*;
 #[cfg(feature = "shortint")]
-use tfhe::shortint::ClassicPBSParameters;
+use tfhe::shortint::parameters::ShortintKeySwitchingParameters;
+#[cfg(feature = "shortint")]
+use tfhe::shortint::PBSParameters;
 
 #[derive(Clone, Copy, Default, Serialize)]
-pub struct CryptoParametersRecord {
+pub struct CryptoParametersRecord<Scalar: UnsignedInteger> {
     pub lwe_dimension: Option<LweDimension>,
     pub glwe_dimension: Option<GlweDimension>,
     pub polynomial_size: Option<PolynomialSize>,
@@ -25,10 +27,11 @@ pub struct CryptoParametersRecord {
     pub cbs_base_log: Option<DecompositionBaseLog>,
     pub message_modulus: Option<usize>,
     pub carry_modulus: Option<usize>,
+    pub ciphertext_modulus: Option<CiphertextModulus<Scalar>>,
 }
 
 #[cfg(feature = "boolean")]
-impl From<BooleanParameters> for CryptoParametersRecord {
+impl<Scalar: UnsignedInteger> From<BooleanParameters> for CryptoParametersRecord<Scalar> {
     fn from(params: BooleanParameters) -> Self {
         CryptoParametersRecord {
             lwe_dimension: Some(params.lwe_dimension),
@@ -47,21 +50,57 @@ impl From<BooleanParameters> for CryptoParametersRecord {
             cbs_base_log: None,
             message_modulus: None,
             carry_modulus: None,
+            ciphertext_modulus: Some(CiphertextModulus::<Scalar>::new_native()),
         }
     }
 }
 
 #[cfg(feature = "shortint")]
-impl From<ClassicPBSParameters> for CryptoParametersRecord {
-    fn from(params: ClassicPBSParameters) -> Self {
+impl<Scalar> From<PBSParameters> for CryptoParametersRecord<Scalar>
+where
+    Scalar: UnsignedInteger + CastInto<u128>,
+{
+    fn from(params: PBSParameters) -> Self {
         CryptoParametersRecord {
-            lwe_dimension: Some(params.lwe_dimension),
-            glwe_dimension: Some(params.glwe_dimension),
-            polynomial_size: Some(params.polynomial_size),
-            lwe_modular_std_dev: Some(params.lwe_modular_std_dev),
-            glwe_modular_std_dev: Some(params.glwe_modular_std_dev),
-            pbs_base_log: Some(params.pbs_base_log),
-            pbs_level: Some(params.pbs_level),
+            lwe_dimension: Some(params.lwe_dimension()),
+            glwe_dimension: Some(params.glwe_dimension()),
+            polynomial_size: Some(params.polynomial_size()),
+            lwe_modular_std_dev: Some(params.lwe_modular_std_dev()),
+            glwe_modular_std_dev: Some(params.glwe_modular_std_dev()),
+            pbs_base_log: Some(params.pbs_base_log()),
+            pbs_level: Some(params.pbs_level()),
+            ks_base_log: Some(params.ks_base_log()),
+            ks_level: Some(params.ks_level()),
+            pfks_level: None,
+            pfks_base_log: None,
+            pfks_modular_std_dev: None,
+            cbs_level: None,
+            cbs_base_log: None,
+            message_modulus: Some(params.message_modulus().0),
+            carry_modulus: Some(params.carry_modulus().0),
+            ciphertext_modulus: Some(
+                params
+                    .ciphertext_modulus()
+                    .try_to()
+                    .expect("failed to convert ciphertext modulus"),
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "shortint")]
+impl<Scalar: UnsignedInteger> From<ShortintKeySwitchingParameters>
+    for CryptoParametersRecord<Scalar>
+{
+    fn from(params: ShortintKeySwitchingParameters) -> Self {
+        CryptoParametersRecord {
+            lwe_dimension: None,
+            glwe_dimension: None,
+            polynomial_size: None,
+            lwe_modular_std_dev: None,
+            glwe_modular_std_dev: None,
+            pbs_base_log: None,
+            pbs_level: None,
             ks_base_log: Some(params.ks_base_log),
             ks_level: Some(params.ks_level),
             pfks_level: None,
@@ -69,8 +108,9 @@ impl From<ClassicPBSParameters> for CryptoParametersRecord {
             pfks_modular_std_dev: None,
             cbs_level: None,
             cbs_base_log: None,
-            message_modulus: Some(params.message_modulus.0),
-            carry_modulus: Some(params.carry_modulus.0),
+            message_modulus: None,
+            carry_modulus: None,
+            ciphertext_modulus: None,
         }
     }
 }
@@ -113,10 +153,10 @@ pub enum OperatorType {
 }
 
 #[derive(Serialize)]
-struct BenchmarkParametersRecord {
+struct BenchmarkParametersRecord<Scalar: UnsignedInteger> {
     display_name: String,
     crypto_parameters_alias: String,
-    crypto_parameters: CryptoParametersRecord,
+    crypto_parameters: CryptoParametersRecord<Scalar>,
     message_modulus: Option<usize>,
     carry_modulus: Option<usize>,
     ciphertext_modulus: usize,
@@ -134,7 +174,10 @@ struct BenchmarkParametersRecord {
 }
 
 /// Writes benchmarks parameters to disk in JSON format.
-pub fn write_to_json<T: Into<CryptoParametersRecord>>(
+pub fn write_to_json<
+    Scalar: UnsignedInteger + Serialize,
+    T: Into<CryptoParametersRecord<Scalar>>,
+>(
     bench_id: &str,
     params: T,
     params_alias: impl Into<String>,

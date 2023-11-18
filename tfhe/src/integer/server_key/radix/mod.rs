@@ -4,33 +4,39 @@ mod comparison;
 mod mul;
 mod neg;
 mod scalar_add;
-mod scalar_mul;
-mod scalar_sub;
+pub(super) mod scalar_mul;
+pub(super) mod scalar_sub;
 mod shift;
 mod sub;
 
 use super::ServerKey;
 
 use crate::integer::block_decomposition::DecomposableInto;
-use crate::integer::ciphertext::RadixCiphertext;
+use crate::integer::ciphertext::{IntegerRadixCiphertext, RadixCiphertext};
 use crate::integer::encryption::encrypt_words_radix_impl;
 
 #[cfg(test)]
 mod tests;
 
 impl ServerKey {
+    pub fn create_trivial_zero_assign_radix(&self, ctxt: &mut RadixCiphertext) {
+        for block in &mut ctxt.blocks {
+            self.key.create_trivial_assign(block, 0)
+        }
+    }
+
     /// Create a ciphertext filled with zeros
     ///
     /// # Example
     ///
     /// ```rust
     /// use tfhe::integer::{gen_keys_radix, RadixCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let ctxt: RadixCiphertext = sks.create_trivial_zero_radix(num_blocks);
     ///
@@ -55,12 +61,12 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::{gen_keys_radix, RadixCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let ctxt: RadixCiphertext = sks.create_trivial_radix(212u64, num_blocks);
     ///
@@ -68,9 +74,10 @@ impl ServerKey {
     /// let dec: u64 = cks.decrypt(&ctxt);
     /// assert_eq!(212, dec);
     /// ```
-    pub fn create_trivial_radix<T>(&self, value: T, num_blocks: usize) -> RadixCiphertext
+    pub fn create_trivial_radix<T, C>(&self, value: T, num_blocks: usize) -> C
     where
         T: DecomposableInto<u64>,
+        C: IntegerRadixCiphertext + From<Vec<crate::shortint::Ciphertext>>,
     {
         encrypt_words_radix_impl(
             &self.key,
@@ -87,12 +94,12 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 7u64;
     ///
@@ -106,7 +113,7 @@ impl ServerKey {
     /// // Decrypt
     /// let res: u64 = cks.decrypt(&ct1);
     /// assert_eq!(
-    ///     7 * (PARAM_MESSAGE_2_CARRY_2.message_modulus.0 as u64).pow(added_blocks as u32),
+    ///     7 * (PARAM_MESSAGE_2_CARRY_2_KS_PBS.message_modulus.0 as u64).pow(added_blocks as u32),
     ///     res
     /// );
     /// ```
@@ -126,12 +133,12 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 7u64;
     ///
@@ -145,7 +152,7 @@ impl ServerKey {
     /// // Decrypt
     /// let res: u64 = cks.decrypt(&ct_res);
     /// assert_eq!(
-    ///     7 * (PARAM_MESSAGE_2_CARRY_2.message_modulus.0 as u64).pow(added_blocks as u32),
+    ///     7 * (PARAM_MESSAGE_2_CARRY_2_KS_PBS.message_modulus.0 as u64).pow(added_blocks as u32),
     ///     res
     /// );
     /// ```
@@ -167,12 +174,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 7u64;
     ///
@@ -203,12 +210,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 7u64;
     ///
@@ -240,12 +247,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 119u64;
     ///
@@ -271,12 +278,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 119u64;
     ///
@@ -308,12 +315,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 119u64;
     ///
@@ -339,12 +346,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 119u64;
     ///
@@ -375,12 +382,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 7u64;
     ///
@@ -395,15 +402,18 @@ where {
     /// let res: u64 = cks.decrypt_one_block(&ct_res.blocks()[1]);
     /// assert_eq!(3, res);
     /// ```
-    pub fn propagate(&self, ctxt: &mut RadixCiphertext, index: usize) {
-        let carry = self.key.carry_extract(&ctxt.blocks[index]);
+    pub fn propagate<T>(&self, ctxt: &mut T, index: usize)
+    where
+        T: IntegerRadixCiphertext,
+    {
+        let carry = self.key.carry_extract(&ctxt.blocks()[index]);
 
-        ctxt.blocks[index] = self.key.message_extract(&ctxt.blocks[index]);
+        ctxt.blocks_mut()[index] = self.key.message_extract(&ctxt.blocks()[index]);
 
         //add the carry to the next block
-        if index < ctxt.blocks.len() - 1 {
+        if index < ctxt.blocks().len() - 1 {
             self.key
-                .unchecked_add_assign(&mut ctxt.blocks[index + 1], &carry);
+                .unchecked_add_assign(&mut ctxt.blocks_mut()[index + 1], &carry);
         }
     }
 
@@ -413,12 +423,12 @@ where {
     ///
     ///```rust
     /// use tfhe::integer::{gen_keys_radix, IntegerCiphertext};
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// let num_blocks = 4;
     ///
     /// // Generate the client key and the server key:
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let msg = 10;
     ///
@@ -433,7 +443,10 @@ where {
     /// let res: u64 = cks.decrypt(&ct_res);
     /// assert_eq!(msg + msg, res);
     /// ```
-    pub fn full_propagate(&self, ctxt: &mut RadixCiphertext) {
+    pub fn full_propagate<T>(&self, ctxt: &mut T)
+    where
+        T: IntegerRadixCiphertext,
+    {
         self.partial_propagate(ctxt, 0);
     }
 
@@ -442,8 +455,11 @@ where {
     ///
     /// Last carry is not propagated as
     /// it has nothing to propagate to.
-    fn partial_propagate(&self, ctxt: &mut RadixCiphertext, start_index: usize) {
-        let len = ctxt.blocks.len();
+    fn partial_propagate<T>(&self, ctxt: &mut T, start_index: usize)
+    where
+        T: IntegerRadixCiphertext,
+    {
+        let len = ctxt.blocks().len();
         for i in start_index..len {
             self.propagate(ctxt, i);
         }

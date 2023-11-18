@@ -8,11 +8,13 @@ function usage() {
     echo "--help                    Print this message"
     echo "--rust-toolchain          The toolchain to run the tests with default: stable"
     echo "--multi-bit               Run multi-bit tests only: default off"
+    echo "--cargo-profile           The cargo profile used to build tests"
     echo
 }
 
 RUST_TOOLCHAIN="+stable"
 multi_bit=""
+cargo_profile="release"
 
 while [ -n "$1" ]
 do
@@ -29,6 +31,11 @@ do
 
         "--multi-bit" )
             multi_bit="_multi_bit"
+            ;;
+
+        "--cargo-profile" )
+            shift
+            cargo_profile="$1"
             ;;
 
         *)
@@ -75,26 +82,26 @@ if [[ "${BIG_TESTS_INSTANCE}" != TRUE ]]; then
     if [[ "${FAST_TESTS}" != TRUE ]]; then
        filter_expression_small_params="""\
 (\
-   test(/^shortint::.*_param${multi_bit}_message_1_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_3/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_4/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_5/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_6/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_3/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_3/) \
+   test(/^shortint::.*_param${multi_bit}_message_1_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_4${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_5${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_6${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
 )\
 and not test(~smart_add_and_mul)""" # This test is too slow
     else
         filter_expression_small_params="""\
 (\
-   test(/^shortint::.*_param${multi_bit}_message_2_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_3/) \
+   test(/^shortint::.*_param${multi_bit}_message_2_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
 )\
 and not test(~smart_add_and_mul)""" # This test is too slow
     fi
@@ -102,7 +109,7 @@ and not test(~smart_add_and_mul)""" # This test is too slow
     # Run tests only no examples or benches with small params and more threads
     cargo "${RUST_TOOLCHAIN}" nextest run \
         --tests \
-        --release \
+        --cargo-profile "${cargo_profile}" \
         --package tfhe \
         --profile ci \
         --features="${ARCH_FEATURE}",shortint,internal-keycache \
@@ -112,14 +119,14 @@ and not test(~smart_add_and_mul)""" # This test is too slow
     if [[ "${FAST_TESTS}" != TRUE ]]; then
         filter_expression_big_params="""\
 (\
-   test(/^shortint::.*_param${multi_bit}_message_4_carry_4/) \
+   test(/^shortint::.*_param${multi_bit}_message_4_carry_4${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
 ) \
 and not test(~smart_add_and_mul)"""
 
     # Run tests only no examples or benches with big params and less threads
     cargo "${RUST_TOOLCHAIN}" nextest run \
         --tests \
-        --release \
+        --cargo-profile "${cargo_profile}" \
         --package tfhe \
         --profile ci \
         --features="${ARCH_FEATURE}",shortint,internal-keycache \
@@ -128,38 +135,38 @@ and not test(~smart_add_and_mul)"""
 
         if [[ "${multi_bit}" == "" ]]; then
             cargo "${RUST_TOOLCHAIN}" test \
-                --release \
+                --profile "${cargo_profile}" \
                 --package tfhe \
                 --features="${ARCH_FEATURE}",shortint,internal-keycache \
                 --doc \
-                shortint::
+                -- shortint::
         fi
     fi
 else
     if [[ "${FAST_TESTS}" != TRUE ]]; then
         filter_expression="""\
 (\
-   test(/^shortint::.*_param${multi_bit}_message_1_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_3/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_4/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_5/) \
-or test(/^shortint::.*_param${multi_bit}_message_1_carry_6/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_3/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_3_carry_3/) \
-or test(/^shortint::.*_param${multi_bit}_message_4_carry_4/) \
+   test(/^shortint::.*_param${multi_bit}_message_1_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_4${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_5${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_1_carry_6${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_3_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_4_carry_4${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
 )\
 and not test(~smart_add_and_mul)""" # This test is too slow
     else
         filter_expression="""\
 (\
-   test(/^shortint::.*_param${multi_bit}_message_2_carry_1/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_2/) \
-or test(/^shortint::.*_param${multi_bit}_message_2_carry_3/) \
+   test(/^shortint::.*_param${multi_bit}_message_2_carry_1${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_2${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
+or test(/^shortint::.*_param${multi_bit}_message_2_carry_3${multi_bit:+"_group_[0-9]"}(_compact_pk)?_ks_pbs/) \
 )\
 and not test(~smart_add_and_mul)""" # This test is too slow
     fi
@@ -167,7 +174,7 @@ and not test(~smart_add_and_mul)""" # This test is too slow
     # Run tests only no examples or benches with small params and more threads
     cargo "${RUST_TOOLCHAIN}" nextest run \
         --tests \
-        --release \
+        --cargo-profile "${cargo_profile}" \
         --package tfhe \
         --profile ci \
         --features="${ARCH_FEATURE}",shortint,internal-keycache \
@@ -176,11 +183,11 @@ and not test(~smart_add_and_mul)""" # This test is too slow
 
     if [[ "${multi_bit}" == "" ]]; then
         cargo "${RUST_TOOLCHAIN}" test \
-            --release \
+            --profile "${cargo_profile}" \
             --package tfhe \
             --features="${ARCH_FEATURE}",shortint,internal-keycache \
             --doc \
-            shortint:: -- --test-threads="$(${nproc_bin})"
+            -- --test-threads="$(${nproc_bin})" shortint::
     fi
 fi
 

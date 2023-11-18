@@ -19,11 +19,11 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 170;
     /// let clear_2 = 3;
@@ -64,11 +64,11 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 55;
     /// let clear_2 = 3;
@@ -113,11 +113,11 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 170;
     /// let clear_2 = 3;
@@ -174,11 +174,11 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 170;
     /// let clear_2 = 3;
@@ -306,7 +306,9 @@ impl ServerKey {
         // so we use another one that still works
         if num_bits_in_carry == 1 {
             *lhs = self
-                .smart_binary_op_seq_parallelized(&mut terms, ServerKey::smart_add_parallelized)
+                .smart_binary_op_seq_parallelized(&mut terms, |sks, a, b| {
+                    sks.smart_add_parallelized(a, b)
+                })
                 .unwrap_or_else(|| self.create_trivial_zero_radix(num_blocks));
 
             self.full_propagate_parallelized(lhs);
@@ -335,30 +337,44 @@ impl ServerKey {
             terms.par_chunks_exact_mut(chunk_size).for_each(|chunk| {
                 let (s, rest) = chunk.split_first_mut().unwrap();
                 let mut first_block_where_addition_happenned = num_blocks - 1;
+                let mut last_block_where_addition_happenned = num_blocks - 1;
                 for a in rest.iter() {
-                    let pos = a
+                    let first_block_to_add = a
                         .blocks
                         .iter()
                         .position(|block| block.degree.0 != 0)
                         .unwrap_or(num_blocks);
                     first_block_where_addition_happenned =
-                        first_block_where_addition_happenned.min(pos);
-                    for (ct_left_i, ct_right_i) in
-                        s.blocks[pos..].iter_mut().zip(a.blocks[pos..].iter())
+                        first_block_where_addition_happenned.min(first_block_to_add);
+                    let last_block_to_add = a
+                        .blocks
+                        .iter()
+                        .rev()
+                        .position(|block| block.degree.0 != 0)
+                        .map(|pos| num_blocks - pos - 1)
+                        .unwrap_or(num_blocks - 1);
+                    last_block_where_addition_happenned =
+                        last_block_where_addition_happenned.max(last_block_to_add);
+                    for (ct_left_i, ct_right_i) in s.blocks
+                        [first_block_to_add..last_block_to_add + 1]
+                        .iter_mut()
+                        .zip(a.blocks[first_block_to_add..last_block_to_add + 1].iter())
                     {
                         self.key.unchecked_add_assign(ct_left_i, ct_right_i);
                     }
                 }
 
                 // last carry is not interesting
-                let mut carry_blocks =
-                    s.blocks[first_block_where_addition_happenned..num_blocks - 1].to_vec();
+                let mut carry_blocks = s.blocks
+                    [first_block_where_addition_happenned..last_block_where_addition_happenned + 1]
+                    .to_vec();
 
                 let message_blocks = &mut s.blocks;
 
                 rayon::join(
                     || {
-                        message_blocks[first_block_where_addition_happenned..]
+                        message_blocks[first_block_where_addition_happenned
+                            ..last_block_where_addition_happenned + 1]
                             .par_iter_mut()
                             .for_each(|block| {
                                 self.key.message_extract_assign(block);
@@ -411,30 +427,8 @@ impl ServerKey {
             self.unchecked_add_assign(result, term);
         }
 
-        let (mut message_blocks, carry_blocks) = rayon::join(
-            || {
-                result
-                    .blocks
-                    .par_iter()
-                    .map(|block| self.key.message_extract(block))
-                    .collect::<Vec<_>>()
-            },
-            || {
-                let mut carry_blocks = Vec::with_capacity(num_blocks);
-                result.blocks[..num_blocks - 1] // last carry is not interesting
-                    .par_iter()
-                    .map(|block| self.key.carry_extract(block))
-                    .collect_into_vec(&mut carry_blocks);
-                carry_blocks.insert(0, self.key.create_trivial(0));
-                carry_blocks
-            },
-        );
-
-        std::mem::swap(&mut lhs.blocks, &mut message_blocks);
-
-        let carry = RadixCiphertext::from(carry_blocks);
-        self.add_assign_parallelized(lhs, &carry);
-
+        std::mem::swap(&mut lhs.blocks, &mut result.blocks);
+        self.full_propagate_parallelized(lhs);
         assert!(lhs.block_carries_are_empty());
     }
 
@@ -453,11 +447,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 255;
     /// let clear_2 = 143;
@@ -478,14 +472,31 @@ impl ServerKey {
         lhs: &mut RadixCiphertext,
         rhs: &RadixCiphertext,
     ) {
-        let num_blocks = lhs.blocks.len();
-        let mut terms = vec![self.create_trivial_zero_radix(num_blocks); num_blocks];
-        terms
-            .par_iter_mut()
-            .zip(rhs.blocks.par_iter().enumerate())
-            .for_each(|(term, (i, rhs_i))| {
-                *term = self.unchecked_block_mul_parallelized(lhs, rhs_i, i);
-            });
+        if rhs.holds_boolean_value() {
+            self.zero_out_if_condition_is_false(lhs, &rhs.blocks[0]);
+            return;
+        }
+
+        if lhs.holds_boolean_value() {
+            let mut cloned_rhs = rhs.clone();
+            self.zero_out_if_condition_is_false(&mut cloned_rhs, &lhs.blocks[0]);
+            *lhs = cloned_rhs;
+            return;
+        }
+
+        let terms = rhs
+            .blocks
+            .par_iter()
+            .enumerate()
+            .filter_map(|(i, block)| {
+                if block.degree.0 == 0 {
+                    // Block is a trivial 0, no need to waste time multiplying
+                    None
+                } else {
+                    Some(self.unchecked_block_mul_parallelized(lhs, block, i))
+                }
+            })
+            .collect::<Vec<_>>();
 
         self.sum_multiplication_terms_into(lhs, terms);
     }
@@ -522,11 +533,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 170;
     /// let clear_2 = 6;
@@ -611,11 +622,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // Generate the client key and the server key:
     /// let num_blocks = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, num_blocks);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, num_blocks);
     ///
     /// let clear_1 = 170;
     /// let clear_2 = 6;

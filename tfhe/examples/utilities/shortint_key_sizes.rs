@@ -5,11 +5,18 @@ use crate::utilities::{write_to_json, OperatorType};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use tfhe::shortint::keycache::{NamedParam, KEY_CACHE};
+use tfhe::keycache::NamedParam;
+use tfhe::shortint::keycache::KEY_CACHE;
 use tfhe::shortint::parameters::{
-    PARAM_MESSAGE_1_CARRY_1, PARAM_MESSAGE_2_CARRY_2, PARAM_MESSAGE_3_CARRY_3,
-    PARAM_MESSAGE_4_CARRY_4,
+    PARAM_MESSAGE_1_CARRY_1_KS_PBS, PARAM_MESSAGE_2_CARRY_2_KS_PBS, PARAM_MESSAGE_3_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_4_KS_PBS, PARAM_MULTI_BIT_MESSAGE_1_CARRY_1_GROUP_2_KS_PBS,
+    PARAM_MULTI_BIT_MESSAGE_1_CARRY_1_GROUP_3_KS_PBS,
+    PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_2_KS_PBS,
+    PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS,
+    PARAM_MULTI_BIT_MESSAGE_3_CARRY_3_GROUP_2_KS_PBS,
+    PARAM_MULTI_BIT_MESSAGE_3_CARRY_3_GROUP_3_KS_PBS,
 };
+use tfhe::shortint::PBSParameters;
 
 fn write_result(file: &mut File, name: &str, value: usize) {
     let line = format!("{name},{value}\n");
@@ -18,11 +25,17 @@ fn write_result(file: &mut File, name: &str, value: usize) {
 }
 
 fn client_server_key_sizes(results_file: &Path) {
-    let shortint_params_vec = vec![
-        PARAM_MESSAGE_1_CARRY_1,
-        PARAM_MESSAGE_2_CARRY_2,
-        PARAM_MESSAGE_3_CARRY_3,
-        PARAM_MESSAGE_4_CARRY_4,
+    let shortint_params_vec: Vec<PBSParameters> = vec![
+        PARAM_MESSAGE_1_CARRY_1_KS_PBS.into(),
+        PARAM_MESSAGE_2_CARRY_2_KS_PBS.into(),
+        PARAM_MESSAGE_3_CARRY_3_KS_PBS.into(),
+        PARAM_MESSAGE_4_CARRY_4_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_1_CARRY_1_GROUP_2_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_2_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_3_CARRY_3_GROUP_2_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_1_CARRY_1_GROUP_3_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS.into(),
+        PARAM_MULTI_BIT_MESSAGE_3_CARRY_3_GROUP_3_KS_PBS.into(),
     ];
     File::create(results_file).expect("create results file failed");
     let mut file = OpenOptions::new()
@@ -33,7 +46,7 @@ fn client_server_key_sizes(results_file: &Path) {
     let operator = OperatorType::Atomic;
 
     println!("Generating shortint (ClientKey, ServerKey)");
-    for (i, params) in shortint_params_vec.iter().enumerate() {
+    for (i, params) in shortint_params_vec.iter().copied().enumerate() {
         println!(
             "Generating [{} / {}] : {}",
             i + 1,
@@ -41,7 +54,7 @@ fn client_server_key_sizes(results_file: &Path) {
             params.name().to_lowercase()
         );
 
-        let keys = KEY_CACHE.get_from_param(*params);
+        let keys = KEY_CACHE.get_from_param(params);
 
         // Client keys don't have public access to members, but the keys in there are small anyways
         // let cks = keys.client_key();
@@ -50,9 +63,9 @@ fn client_server_key_sizes(results_file: &Path) {
         let test_name = format!("shortint_key_sizes_{}_ksk", params.name());
 
         write_result(&mut file, &test_name, ksk_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
-            *params,
+            params,
             params.name(),
             "KSK",
             &operator,
@@ -70,9 +83,9 @@ fn client_server_key_sizes(results_file: &Path) {
         let test_name = format!("shortint_key_sizes_{}_bsk", params.name());
 
         write_result(&mut file, &test_name, bsk_size);
-        write_to_json(
+        write_to_json::<u64, _>(
             &test_name,
-            *params,
+            params,
             params.name(),
             "BSK",
             &operator,

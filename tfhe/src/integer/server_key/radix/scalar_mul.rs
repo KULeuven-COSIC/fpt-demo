@@ -1,10 +1,49 @@
-use crate::core_crypto::prelude::UnsignedInteger;
+use crate::core_crypto::prelude::{Numeric, UnsignedInteger};
 use crate::integer::block_decomposition::{BlockDecomposer, DecomposableInto};
 use crate::integer::ciphertext::RadixCiphertext;
 use crate::integer::server_key::CheckError;
 use crate::integer::server_key::CheckError::CarryFull;
-use crate::integer::ServerKey;
+use crate::integer::{ServerKey, U256, U512};
 use std::collections::BTreeMap;
+
+pub trait ScalarMultiplier: Numeric {
+    fn is_power_of_two(self) -> bool;
+
+    fn ilog2(self) -> u32;
+}
+
+impl<T> ScalarMultiplier for T
+where
+    T: UnsignedInteger,
+{
+    fn is_power_of_two(self) -> bool {
+        self.is_power_of_two()
+    }
+
+    fn ilog2(self) -> u32 {
+        self.ilog2()
+    }
+}
+
+impl ScalarMultiplier for U256 {
+    fn is_power_of_two(self) -> bool {
+        self.is_power_of_two()
+    }
+
+    fn ilog2(self) -> u32 {
+        self.ilog2()
+    }
+}
+
+impl ScalarMultiplier for U512 {
+    fn is_power_of_two(self) -> bool {
+        self.is_power_of_two()
+    }
+
+    fn ilog2(self) -> u32 {
+        self.ilog2()
+    }
+}
 
 impl ServerKey {
     /// Computes homomorphically a multiplication between a scalar and a ciphertext.
@@ -18,11 +57,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 30;
     /// let scalar = 3;
@@ -58,11 +97,11 @@ impl ServerKey {
     ///
     ///```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 25u64;
     /// let scalar1 = 3;
@@ -97,11 +136,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 33;
     /// let scalar = 3;
@@ -146,11 +185,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 33;
     /// let scalar = 3;
@@ -180,7 +219,7 @@ impl ServerKey {
     /// Computes homomorphically a multiplication between a scalar and a ciphertext.
     ///
     /// `small` means the scalar value shall fit in a __shortint block__.
-    /// For example, if the parameters are PARAM_MESSAGE_2_CARRY_2,
+    /// For example, if the parameters are PARAM_MESSAGE_2_CARRY_2_KS_PBS,
     /// the scalar should fit in 2 bits.
     ///
     /// The result is returned as a new ciphertext.
@@ -189,12 +228,12 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let modulus = 1 << 8;
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 13;
     /// let scalar = 5;
@@ -222,7 +261,7 @@ impl ServerKey {
     /// Computes homomorphically a multiplication between a scalar and a ciphertext.
     ///
     /// `small` means the scalar shall value fit in a __shortint block__.
-    /// For example, if the parameters are PARAM_MESSAGE_2_CARRY_2,
+    /// For example, if the parameters are PARAM_MESSAGE_2_CARRY_2_KS_PBS,
     /// the scalar should fit in 2 bits.
     ///
     /// The result is assigned to the input ciphertext
@@ -231,12 +270,12 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let modulus = 1 << 8;
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 9;
     /// let scalar = 3;
@@ -261,11 +300,11 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 1u64;
     /// let power = 2;
@@ -280,15 +319,10 @@ impl ServerKey {
     /// assert_eq!(16, clear);
     /// ```
     pub fn blockshift(&self, ctxt: &RadixCiphertext, shift: usize) -> RadixCiphertext {
-        let ctxt_zero = self.key.create_trivial(0_u64);
         let mut result = ctxt.clone();
-
-        for res_i in result.blocks[..shift].iter_mut() {
-            *res_i = ctxt_zero.clone();
-        }
-
-        for (res_i, c_i) in result.blocks[shift..].iter_mut().zip(ctxt.blocks.iter()) {
-            *res_i = c_i.clone();
+        result.blocks.rotate_right(shift);
+        for block in &mut result.blocks[..shift] {
+            self.key.create_trivial_assign(block, 0);
         }
         result
     }
@@ -300,12 +334,12 @@ impl ServerKey {
     ///
     /// ```rust
     /// use tfhe::integer::gen_keys_radix;
-    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+    /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
     ///
     /// // We have 4 * 2 = 8 bits of message
     /// let modulus = 1 << 8;
     /// let size = 4;
-    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2, size);
+    /// let (cks, sks) = gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, size);
     ///
     /// let msg = 230;
     /// let scalar = 376;
@@ -321,7 +355,7 @@ impl ServerKey {
     /// ```
     pub fn smart_scalar_mul<T>(&self, ctxt: &mut RadixCiphertext, scalar: T) -> RadixCiphertext
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: ScalarMultiplier + DecomposableInto<u8>,
     {
         if scalar == T::ZERO {
             return self.create_trivial_zero_radix(ctxt.blocks.len());
@@ -372,7 +406,7 @@ impl ServerKey {
 
     pub fn smart_scalar_mul_assign<T>(&self, ctxt: &mut RadixCiphertext, scalar: T)
     where
-        T: UnsignedInteger + DecomposableInto<u8>,
+        T: ScalarMultiplier + DecomposableInto<u8>,
     {
         *ctxt = self.smart_scalar_mul(ctxt, scalar);
     }

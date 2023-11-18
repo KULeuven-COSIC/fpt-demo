@@ -1,6 +1,6 @@
 [package]
 name = "tfhe"
-version = "0.3.0-beta.0"
+version = "0.3.0"
 edition = "2021"
 readme = "../README.md"
 keywords = ["fully", "homomorphic", "encryption", "fhe", "cryptography"]
@@ -64,6 +64,8 @@ paste = "1.0.7"
 fs2 = { version = "0.4.3", optional = true }
 # While we wait for repeat_n in rust standard library
 itertools = "0.10.5"
+num-integer = "0.1.45"
+toml = "0.7.5"
 
 # wasm deps
 wasm-bindgen = { version = "0.2.86", features = [
@@ -81,7 +83,7 @@ boolean = []
 shortint = []
 integer = ["shortint"]
 internal-keycache = ["lazy_static", "fs2", "bincode"]
-fpga = []
+fpga = ["lazy_static"]
 
 # Experimental section
 experimental = []
@@ -224,6 +226,11 @@ required-features = ["integer", "internal-keycache"]
 name = "micro_bench_and"
 path = "examples/utilities/micro_bench_and.rs"
 required-features = ["boolean"]
+
+[[example]]
+name = "write_params_to_file"
+path = "examples/utilities/params_to_file.rs"
+required-features = ["boolean", "shortint", "internal-keycache"]
 
 # Real use-case examples
 

@@ -1,41 +1,42 @@
 #[path = "../utilities.rs"]
 mod utilities;
-use crate::utilities::{write_to_json, OperatorType};
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use tfhe::shortint::keycache::NamedParam;
+use crate::utilities::{write_to_json, OperatorType};
+use std::env;
+
+use criterion::{criterion_group, Criterion};
+use tfhe::keycache::NamedParam;
 use tfhe::shortint::parameters::*;
 use tfhe::shortint::{Ciphertext, ClassicPBSParameters, ServerKey, ShortintParameterSet};
 
 use rand::Rng;
-use tfhe::shortint::keycache::KEY_CACHE;
+use tfhe::shortint::keycache::{KEY_CACHE, KEY_CACHE_WOPBS};
 
-use tfhe::shortint::keycache::KEY_CACHE_WOPBS;
-use tfhe::shortint::parameters::parameters_wopbs::WOPBS_PARAM_MESSAGE_4_NORM2_6;
+use tfhe::shortint::parameters::parameters_wopbs::WOPBS_PARAM_MESSAGE_4_NORM2_6_KS_PBS;
 
 const SERVER_KEY_BENCH_PARAMS: [ClassicPBSParameters; 4] = [
-    PARAM_MESSAGE_1_CARRY_1,
-    PARAM_MESSAGE_2_CARRY_2,
-    PARAM_MESSAGE_3_CARRY_3,
-    PARAM_MESSAGE_4_CARRY_4,
+    PARAM_MESSAGE_1_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_4_KS_PBS,
 ];
 
 const SERVER_KEY_BENCH_PARAMS_EXTENDED: [ClassicPBSParameters; 15] = [
-    PARAM_MESSAGE_1_CARRY_0,
-    PARAM_MESSAGE_1_CARRY_1,
-    PARAM_MESSAGE_2_CARRY_0,
-    PARAM_MESSAGE_2_CARRY_1,
-    PARAM_MESSAGE_2_CARRY_2,
-    PARAM_MESSAGE_3_CARRY_0,
-    PARAM_MESSAGE_3_CARRY_2,
-    PARAM_MESSAGE_3_CARRY_3,
-    PARAM_MESSAGE_4_CARRY_0,
-    PARAM_MESSAGE_4_CARRY_3,
-    PARAM_MESSAGE_4_CARRY_4,
-    PARAM_MESSAGE_5_CARRY_0,
-    PARAM_MESSAGE_6_CARRY_0,
-    PARAM_MESSAGE_7_CARRY_0,
-    PARAM_MESSAGE_8_CARRY_0,
+    PARAM_MESSAGE_1_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_1_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_1_KS_PBS,
+    PARAM_MESSAGE_2_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_2_KS_PBS,
+    PARAM_MESSAGE_3_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_3_KS_PBS,
+    PARAM_MESSAGE_4_CARRY_4_KS_PBS,
+    PARAM_MESSAGE_5_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_6_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_7_CARRY_0_KS_PBS,
+    PARAM_MESSAGE_8_CARRY_0_KS_PBS,
 ];
 
 fn bench_server_key_unary_function<F>(
@@ -50,7 +51,8 @@ fn bench_server_key_unary_function<F>(
     let mut bench_group = c.benchmark_group(bench_name);
 
     for param in params.iter() {
-        let keys = KEY_CACHE.get_from_param(*param);
+        let param: PBSParameters = (*param).into();
+        let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
         let mut rng = rand::thread_rng();
@@ -68,14 +70,14 @@ fn bench_server_key_unary_function<F>(
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
-            *param,
+            param,
             param.name(),
             display_name,
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -94,7 +96,8 @@ fn bench_server_key_binary_function<F>(
     let mut bench_group = c.benchmark_group(bench_name);
 
     for param in params.iter() {
-        let keys = KEY_CACHE.get_from_param(*param);
+        let param: PBSParameters = (*param).into();
+        let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
         let mut rng = rand::thread_rng();
@@ -114,14 +117,14 @@ fn bench_server_key_binary_function<F>(
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
-            *param,
+            param,
             param.name(),
             display_name,
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -140,7 +143,8 @@ fn bench_server_key_binary_scalar_function<F>(
     let mut bench_group = c.benchmark_group(bench_name);
 
     for param in params {
-        let keys = KEY_CACHE.get_from_param(*param);
+        let param: PBSParameters = (*param).into();
+        let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
         let mut rng = rand::thread_rng();
@@ -159,14 +163,14 @@ fn bench_server_key_binary_scalar_function<F>(
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
-            *param,
+            param,
             param.name(),
             display_name,
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -185,7 +189,8 @@ fn bench_server_key_binary_scalar_division_function<F>(
     let mut bench_group = c.benchmark_group(bench_name);
 
     for param in params {
-        let keys = KEY_CACHE.get_from_param(*param);
+        let param: PBSParameters = (*param).into();
+        let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
         let mut rng = rand::thread_rng();
@@ -208,14 +213,14 @@ fn bench_server_key_binary_scalar_division_function<F>(
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
-            *param,
+            param,
             param.name(),
             display_name,
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -226,6 +231,7 @@ fn carry_extract(c: &mut Criterion) {
     let mut bench_group = c.benchmark_group("carry_extract");
 
     for param in SERVER_KEY_BENCH_PARAMS {
+        let param: PBSParameters = param.into();
         let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
@@ -237,21 +243,21 @@ fn carry_extract(c: &mut Criterion) {
 
         let ct_0 = cks.encrypt(clear_0);
 
-        let bench_id = format!("ServerKey::carry_extract::{}", param.name());
+        let bench_id = format!("shortint::carry_extract::{}", param.name());
         bench_group.bench_function(&bench_id, |b| {
             b.iter(|| {
                 let _ = sks.carry_extract(&ct_0);
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
             param,
             param.name(),
             "carry_extract",
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -262,6 +268,7 @@ fn programmable_bootstrapping(c: &mut Criterion) {
     let mut bench_group = c.benchmark_group("programmable_bootstrap");
 
     for param in SERVER_KEY_BENCH_PARAMS {
+        let param: PBSParameters = param.into();
         let keys = KEY_CACHE.get_from_param(param);
         let (cks, sks) = (keys.client_key(), keys.server_key());
 
@@ -275,7 +282,7 @@ fn programmable_bootstrapping(c: &mut Criterion) {
 
         let ctxt = cks.encrypt(clear_0);
 
-        let bench_id = format!("ServerKey::programmable_bootstrap::{}", param.name());
+        let bench_id = format!("shortint::programmable_bootstrap::{}", param.name());
 
         bench_group.bench_function(&bench_id, |b| {
             b.iter(|| {
@@ -283,14 +290,14 @@ fn programmable_bootstrapping(c: &mut Criterion) {
             })
         });
 
-        write_to_json(
+        write_to_json::<u64, _>(
             &bench_id,
             param,
             param.name(),
             "pbs",
             &OperatorType::Atomic,
-            param.message_modulus.0.ilog2(),
-            vec![param.message_modulus.0.ilog2()],
+            param.message_modulus().0.ilog2(),
+            vec![param.message_modulus().0.ilog2()],
         );
     }
 
@@ -301,7 +308,7 @@ fn programmable_bootstrapping(c: &mut Criterion) {
 fn _bench_wopbs_param_message_8_norm2_5(c: &mut Criterion) {
     let mut bench_group = c.benchmark_group("programmable_bootstrap");
 
-    let param = WOPBS_PARAM_MESSAGE_4_NORM2_6;
+    let param = WOPBS_PARAM_MESSAGE_4_NORM2_6_KS_PBS;
     let param_set: ShortintParameterSet = param.try_into().unwrap();
     let pbs_params = param_set.pbs_parameters().unwrap();
 
@@ -330,7 +337,7 @@ macro_rules! define_server_key_unary_bench_fn (
       fn $server_key_method(c: &mut Criterion) {
           bench_server_key_unary_function(
               c,
-              concat!("ServerKey::", stringify!($server_key_method)),
+              concat!("shortint::", stringify!($server_key_method)),
               stringify!($name),
               |server_key, lhs| {
                 let _ = server_key.$server_key_method(lhs);},
@@ -344,7 +351,7 @@ macro_rules! define_server_key_bench_fn (
       fn $server_key_method(c: &mut Criterion) {
           bench_server_key_binary_function(
               c,
-              concat!("ServerKey::", stringify!($server_key_method)),
+              concat!("shortint::", stringify!($server_key_method)),
               stringify!($name),
               |server_key, lhs, rhs| {
                 let _ = server_key.$server_key_method(lhs, rhs);},
@@ -358,7 +365,7 @@ macro_rules! define_server_key_scalar_bench_fn (
       fn $server_key_method(c: &mut Criterion) {
           bench_server_key_binary_scalar_function(
               c,
-              concat!("ServerKey::", stringify!($server_key_method)),
+              concat!("shortint::", stringify!($server_key_method)),
               stringify!($name),
               |server_key, lhs, rhs| {
                 let _ = server_key.$server_key_method(lhs, rhs);},
@@ -372,7 +379,7 @@ macro_rules! define_server_key_scalar_div_bench_fn (
       fn $server_key_method(c: &mut Criterion) {
           bench_server_key_binary_scalar_division_function(
               c,
-              concat!("ServerKey::", stringify!($server_key_method)),
+              concat!("shortint::", stringify!($server_key_method)),
               stringify!($name),
               |server_key, lhs, rhs| {
                 let _ = server_key.$server_key_method(lhs, rhs);},
@@ -632,33 +639,32 @@ define_server_key_scalar_div_bench_fn!(
 );
 
 criterion_group!(
-    arithmetic_operation,
-    unchecked_neg,
-    unchecked_add,
-    unchecked_sub,
-    unchecked_mul_lsb,
-    unchecked_mul_msb,
-    unchecked_div,
+    smart_ops,
     smart_bitand,
     smart_bitor,
     smart_bitxor,
     smart_add,
     smart_sub,
     smart_mul_lsb,
+);
+
+criterion_group!(
+    unchecked_ops,
+    unchecked_neg,
+    unchecked_add,
+    unchecked_sub,
+    unchecked_mul_lsb,
+    unchecked_mul_msb,
+    unchecked_div,
     unchecked_greater,
     unchecked_less,
     unchecked_equal,
     carry_extract,
-    // programmable_bootstrapping,
-    // multivalue_programmable_bootstrapping
-    //bench_two_block_pbs
-    //wopbs_v0_norm2_2,
-    //bench_wopbs_param_message_8_norm2_5,
     programmable_bootstrapping
 );
 
 criterion_group!(
-    arithmetic_scalar_operation,
+    unchecked_scalar_ops,
     unchecked_scalar_add,
     unchecked_scalar_mul,
     unchecked_scalar_sub,
@@ -711,10 +717,27 @@ criterion_group!(
     casting::cast
 );
 
-criterion_main!(
-    // arithmetic_operation,
-    // arithmetic_scalar_operation,
-    casting,
-    default_ops,
-    default_scalar_ops,
-);
+fn main() {
+    fn default_bench() {
+        casting();
+        default_ops();
+        default_scalar_ops();
+    }
+
+    match env::var("__TFHE_RS_BENCH_OP_FLAVOR") {
+        Ok(val) => {
+            match val.to_lowercase().as_str() {
+                "default" => default_bench(),
+                "smart" => smart_ops(),
+                "unchecked" => {
+                    unchecked_ops();
+                    unchecked_scalar_ops();
+                }
+                _ => panic!("unknown benchmark operations flavor"),
+            };
+        }
+        Err(_) => default_bench(),
+    };
+
+    Criterion::default().configure_from_args().final_summary();
+}
