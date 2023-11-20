@@ -6,13 +6,24 @@ In fact, we already provide an `.awsxclbin` file, which is set publicly accessib
 
 ___
 
-Before the start, you should follow the instructions on [aws_f1_setup.md](./aws_f1_setup.md) for setting up an F1 instance. Afterwards, clone this repository:
+Before the start, you should follow the instructions on [aws_f1_setup.md](./aws_f1_setup.md) for setting up an F1 instance. 
+
+You need the version of this repository that includes the `.xclbin` file. As that file is >650 MB, we hosted that version on [Zenodo](https://zenodo.org/), which is the CERN Data Centre-backed research data repository. You can reach to that archive version by [https://zenodo.org/records/10158881](https://zenodo.org/records/10158881).
+
+Let's still work on this GitHub version:
 
 ```bash
 FPT_DIR=~/fpt-demo
 git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR --branch fpt-demo
 cd $FPT_DIR
 ```
+
+Get the `.xclbin` from the Zenodo version:
+
+```
+cp <zenodo_version>/demos/accel.xclbin $FPT_DIR/demos/accel.xclbin
+```
+
 ___
 
 As the first step you should configure the `aws-cli``. Run the command below and provide your credentials and the region of preference. Remember that you should pick the region that has F1 instances.
