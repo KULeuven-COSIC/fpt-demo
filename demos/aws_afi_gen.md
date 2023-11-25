@@ -14,7 +14,7 @@ Let's still work on this GitHub version:
 
 ```bash
 FPT_DIR=~/fpt-demo
-git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR --branch fpt-demo
+git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR
 cd $FPT_DIR
 ```
 

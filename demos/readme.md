@@ -12,7 +12,7 @@ Let's clone this repository:
 
 ```bash
 FPT_DIR=~/fpt-demo
-git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR --branch fpt-demo
+git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR
 cd $FPT_DIR
 ```
 
