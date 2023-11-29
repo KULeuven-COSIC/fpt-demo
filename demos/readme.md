@@ -1,8 +1,9 @@
 # Demos
 
-In this directory, we provide two apps that are used to verify, profile, and benchmark the FPT accelerated execution of `TFHE-rs`.
+In this directory, we provide two apps that are used to verify, profile, and benchmark the FPT-accelerated execution of `tfhe-rs`.
 
-:exclamation: Remember that, this demo version of the FPT implements only a reduced parameter set to have the software TFHE-rs board updates in acceptable time. The full design is much more capable, as described in the paper.
+:warning: This demo version of FPT implements only a toy parameter set. The goal is to illustrate that FPT is available on AWS, functional, and integrated with `tfhe-rs`. The full design is much more capable, as described in the paper. If you have an application that could benefit from full parameter set FPT acceleration, please [send us an email](mailto:michiel.vanbeirendonck@esat.kuleuven.be,janpieter.danvers@esat.kuleuven.be,furkan.turan@esat.kuleuven.be,ingrid.verbauwhede@esat.kuleuven.be).
+
 
 ## Setup Before Running the Demos
 
@@ -23,7 +24,7 @@ export FPGA_IMAGE="$FPT_DIR/demos/accel.awsxclbin"
 export FPGA_INDEX=0
 ```
 
-:exclamation: In AWS F1 context, the `accel.awsxclbin` is a container that does not contain the actual FPGA image, but rather links to the image hosted by the AWS. It also makes the image subject to access control. If you wish to run this demo, send us an email with your AWS user ID, and we will grant you access to the image.
+:warning: In AWS F1 context, the `accel.awsxclbin` is a container that does not contain the actual FPGA image, but rather links to the image hosted by the AWS. It also makes the image subject to access control. If you wish to run this demo, send us an email with your AWS user ID, and we will grant you access to the image.
 
 Once the setup above is done, you can continue with the demos below.
 
