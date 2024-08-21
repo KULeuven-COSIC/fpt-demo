@@ -10,14 +10,25 @@ In your communication to AWS, please pay attention that the F1 access permission
 
 ## Instantiate an F1 Instance
 
-Instantiate an `f1.2xlarge` instance with `FPGA Developer AMI`. (Please note that, the instructions below are NOT prepared for the `Amazon Linux 2` version, or the one from `Community AMI`). This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
+Instantiate an `f1.2xlarge` instance with `FPGA Developer AMI`. This AMI is not free of charge, but it is easier to work with for short-time uses of this demo. Otherwise, the XRT installation is actually more complicated than described [here](https://github.com/aws/aws-fpga/blob/master/Vitis/docs/XRT_installation_instructions.md).
+
+Please note that, the instructions below are NOT prepared for the `Amazon Linux 2` version, or the one from `Community AMI`.
 
 ## Preparation
 
-Once the instance is initialised, login and install the dependencies:
+Once the instance is initialised, login and install the dependencies.
 
-Start with the basics:
+At first, we should update the package repo URLs. Unfortunately, `FPGA Developer AMI` is based on CentOS 7, which is arriving to its End-of-Life. Its default URL to package download mirror is already obsolate. As a workaround, we will start with updating the `.repo` files:
+
+```bash
+sudo sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+sudo sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+sudo sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
 ```
+Note that: we might need to re-run these commands, if the following `yum` commands fail; one can introduce a new `yum.repo`, causing the next one to fail.
+
+Let's start with the basics:
+```bash
 sudo yum update
 sudo yum upgrade
 sudo yum group install "Development Tools"
@@ -29,39 +40,39 @@ Next, we will install Rust for compiling `tfhe-rs`.
 First, we should install a few dependencies.
 
 Install `alsa`:
-```
+```bash
 sudo yum install alsa-lib-devel
 ```
 
 Install `systemd-devel`:
-```
+```bash
 sudo yum install systemd-devel
 ```
 
 This one is to install a newer version of `clang`, the default of which is lower than 3.5, and not compatible:
-```
+```bash
 sudo yum install centos-release-scl
 sudo yum install llvm-toolset-7
 scl enable llvm-toolset-7 bash
 ```
 
 Now, install Rust:
-```
+```bash
 curl https://sh.rustup.rs -sSf > RUSTUP.sh
 sh RUSTUP.sh -y
 rm RUSTUP.sh
 source "$HOME/.cargo/env"
 ```
 
-The demo uses the `nightly` version of Rust, hence switch to that version:
-```
-rustup toolchain install nightly
-rustup default nightly
+The demo uses the `nightly` version of Rust, and preferrably the `2023-11-29` version used at the preparation of this demo:
+```bash
+rustup install nightly-2023-11-29
+rustup default nightly-2023-11-29
 ```
 ___
 
 For preparing the FPGA runtime, we will need the `aws-fpga` repo:
-```
+```bash
 AWS_DIR=~/aws-fpga
 git clone https://github.com/aws/aws-fpga.git $AWS_DIR
 ```
