@@ -9,12 +9,13 @@ In this directory, we provide two apps that are used to verify, profile, and ben
 
 To run the demos, you must first configure the AWS F1 instances. This includes installing AWS and AMD-provided drivers. A guide [`aws_f1_setup.md`](aws_f1_setup.md) is provided to describe the setup in steps.
 
-Let's clone this repository:
+Let's clone this repository and prepare the environment:
 
 ```bash
 FPT_DIR=~/fpt-demo
 git clone https://github.com/KULeuven-COSIC/fpt-demo.git $FPT_DIR
 cd $FPT_DIR
+./scripts/prepare_env.sh
 ```
 
 You should set these two environmental variables, which will indicate to the demo where to find the FPGA image of the FPT.
@@ -30,7 +31,7 @@ Once the setup above is done, you can continue with the demos below.
 
 ## Demo: FPGA Test
 
-Once AWS F1 instance is set up, this app tests the correctness of FPT. It also allows benchmarking performance etc. 
+Once AWS F1 instance is set up, this app tests the correctness of FPT. It also allows benchmarking performance etc.
 
 ```bash
 cargo run --release --bin fpga --features fpga
