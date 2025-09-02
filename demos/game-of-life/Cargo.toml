@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tfhe = { path = "../../tfhe", features = [ "boolean", "shortint", "integer", "nightly-avx512", "x86_64-unix", "seeder_deterministic" ] }
-rayon = { version = "1.7.0"}
+tfhe = { path = "../../../tfhe-rs/tfhe", features = [ "boolean", "shortint", "integer", "nightly-avx512", "x86_64-unix", "seeder_deterministic" ] }
+rayon = "1.7.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 serde_json = "1.0.94"
