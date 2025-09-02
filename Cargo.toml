@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["tfhe", "tasks", "demos/fpga-test", "demos/game-of-life"]
+members = ["demos/fpga-test", "demos/game-of-life"]
 
 [profile.bench]
 lto = "fat"
